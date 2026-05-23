@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password      String?
+  name          String
+  role          String    @default("SISWA")
+  avatar        String?
+  xp            Int       @default(0)
+  level         Int       @default(1)
+  rank          String    @default("BRONZE")
+  googleId      String?   @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  quizzesCreated Quiz[]   @relation("QuizCreator")
+  achievements  UserAchievement[]
+  sessions      Session[]
+  tournamentEntries TournamentEntry[]
+}
+
+model Quiz {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  creatorId   String
+  creator     User     @relation("QuizCreator", fields: [creatorId], references: [id])
+  questions   Question[]
+  rooms       Room[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  isPublic    Boolean  @default(true)
+}
+
+model Question {
+  id          String   @id @default(uuid())
+  quizId      String
+  quiz        Quiz     @relation(fields: [quizId], references: [id])
+  text        String
+  image       String?
+  timeLimit   Int      @default(30) // seconds
+  points      Int      @default(1000)
+  answers     Answer[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Answer {
+  id          String   @id @default(uuid())
+  questionId  String
+  question    Question @relation(fields: [questionId], references: [id])
+  text        String
+  isCorrect   Boolean
+}
+
+model Room {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  quizId      String
+  quiz        Quiz     @relation(fields: [quizId], references: [id])
+  mode        String   @default("EXAM")
+  status      String   @default("WAITING") // WAITING, PLAYING, FINISHED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  sessions    Session[]
+}
+
+model Session {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  roomId      String
+  room        Room     @relation(fields: [roomId], references: [id])
+  score       Int      @default(0)
+  combo       Int      @default(0)
+  joinedAt    DateTime @default(now())
+  completedAt DateTime?
+  analytics   Analytics?
+}
+
+model Achievement {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  icon        String
+  condition   String
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  unlockedAt    DateTime @default(now())
+}
+
+model Tournament {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  startDate   DateTime
+  endDate     DateTime
+  status      String   @default("UPCOMING")
+  entries     TournamentEntry[]
+}
+
+model TournamentEntry {
+  id            String   @id @default(uuid())
+  tournamentId  String
+  tournament    Tournament @relation(fields: [tournamentId], references: [id])
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  score         Int      @default(0)
+}
+
+model Analytics {
+  id          String   @id @default(uuid())
+  sessionId   String   @unique
+  session     Session  @relation(fields: [sessionId], references: [id])
+  correctCount Int     @default(0)
+  wrongCount   Int     @default(0)
+  avgTime      Float   @default(0)
+  cheatingAttempts Int @default(0)
+}
+
+model Leaderboard {
+  id          String   @id @default(uuid())
+  userId      String
+  score       Int
+  period      String   // WEEKLY, MONTHLY, ALL_TIME
+  updatedAt   DateTime @updatedAt
+}

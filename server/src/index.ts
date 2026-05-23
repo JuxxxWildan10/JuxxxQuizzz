@@ -16,16 +16,32 @@ dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
+  : ['http://localhost:3000'];
+
+const corsOptions = {
+  origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return cb(null, true);
+    if (process.env.NODE_ENV !== 'production') return cb(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    cb(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  credentials: true,
+};
+
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: process.env.NODE_ENV !== 'production' ? '*' : ALLOWED_ORIGINS,
     methods: ['GET', 'POST']
   }
 });
 
 export const prisma = new PrismaClient();
 
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Routes

@@ -1,107 +1,16 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
 
-const JWT_SECRET  = process.env.JWT_SECRET  || 'edubattle-super-secret-2025';
-const JWT_EXPIRES = process.env.JWT_EXPIRES || '7d';
-const SALT_ROUNDS = 10;
+const JWT_SECRET    = process.env.JWT_SECRET    || 'edubattle-super-secret-2025';
+const JWT_EXPIRES   = process.env.JWT_EXPIRES   || '7d';
+const SALT_ROUNDS   = 10;
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 import { prisma } from '../index';
-
-/* ── Seed demo account into database ── */
-(async () => {
-  try {
-    let demoTeacher = await prisma.user.findUnique({ where: { email: 'demo' } });
-    if (!demoTeacher) {
-      const hash = await bcrypt.hash('demo123', SALT_ROUNDS);
-      demoTeacher = await prisma.user.create({
-        data: {
-          email: 'demo',
-          password: hash,
-          name: 'Demo Guru',
-          role: 'GURU',
-        },
-      });
-      console.log('[Auth] Demo account ready in database → username: demo | password: demo123');
-    } else {
-      console.log('[Auth] Demo account already exists in database.');
-    }
-
-    // Seed sample quiz
-    const sampleQuiz = await prisma.quiz.findUnique({ where: { id: 'sample-1' } });
-    if (!sampleQuiz) {
-      await prisma.quiz.create({
-        data: {
-          id: 'sample-1',
-          title: 'Demo: Pengetahuan Umum',
-          creatorId: demoTeacher.id,
-          questions: {
-            create: [
-              {
-                id: 'q1', text: 'Ibu kota Prancis adalah?', timeLimit: 30,
-                answers: {
-                  create: [
-                    { text: 'London', isCorrect: false },
-                    { text: 'Paris', isCorrect: true },
-                    { text: 'Berlin', isCorrect: false },
-                    { text: 'Roma', isCorrect: false }
-                  ]
-                }
-              },
-              {
-                id: 'q2', text: 'Berapa hasil dari 12 × 12?', timeLimit: 30,
-                answers: {
-                  create: [
-                    { text: '124', isCorrect: false },
-                    { text: '144', isCorrect: true },
-                    { text: '134', isCorrect: false },
-                    { text: '148', isCorrect: false }
-                  ]
-                }
-              },
-              {
-                id: 'q3', text: 'Planet terdekat dengan Matahari?', timeLimit: 30,
-                answers: {
-                  create: [
-                    { text: 'Venus', isCorrect: false },
-                    { text: 'Bumi', isCorrect: false },
-                    { text: 'Merkurius', isCorrect: true },
-                    { text: 'Mars', isCorrect: false }
-                  ]
-                }
-              },
-              {
-                id: 'q4', text: 'Simbol kimia untuk Emas?', timeLimit: 30,
-                answers: {
-                  create: [
-                    { text: 'Au', isCorrect: true },
-                    { text: 'Ag', isCorrect: false },
-                    { text: 'Fe', isCorrect: false },
-                    { text: 'Gd', isCorrect: false }
-                  ]
-                }
-              },
-              {
-                id: 'q5', text: 'Siapa yang menemukan telepon?', timeLimit: 30,
-                answers: {
-                  create: [
-                    { text: 'Edison', isCorrect: false },
-                    { text: 'Tesla', isCorrect: false },
-                    { text: 'Alexander Bell', isCorrect: true },
-                    { text: 'Faraday', isCorrect: false }
-                  ]
-                }
-              }
-            ]
-          }
-        }
-      });
-      console.log('[Auth] Sample quiz seeded in database.');
-    }
-  } catch (err) {
-    console.error('[Auth] Error seeding demo data:', err);
-  }
-})();
 
 function makeToken(payload: Record<string, unknown>) {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES } as jwt.SignOptions);
@@ -267,30 +176,40 @@ router.get('/verify', async (req: Request, res: Response): Promise<void> => {
 
 /* POST /api/auth/google — Google OAuth Login / Registration */
 router.post('/google', async (req: Request, res: Response): Promise<void> => {
-  const { googleId, email, name, avatar, role } = req.body as Record<string, string>;
+  const { credential, role } = req.body as Record<string, string>;
 
-  if (!email || !googleId || !name) {
-    res.status(400).json({ error: 'Data Google tidak lengkap.' }); return;
+  if (!credential) {
+    res.status(400).json({ error: 'Google credential token tidak ditemukan.' }); return;
   }
 
-  const cleanEmail = email.toLowerCase().trim();
-  const assignedRole = role === 'GURU' ? 'GURU' : 'SISWA';
-
   try {
+    // Verify the Google ID token server-side
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email) {
+      res.status(401).json({ error: 'Token Google tidak valid.' }); return;
+    }
+
+    const googleId   = payload.sub;
+    const cleanEmail = payload.email.toLowerCase();
+    const name       = payload.name || payload.email.split('@')[0];
+    const avatar     = payload.picture || null;
+    const assignedRole = role === 'GURU' ? 'GURU' : 'SISWA';
+
     let user = await prisma.user.findFirst({
-      where: {
-        OR: [{ googleId }, { email: cleanEmail }]
-      }
+      where: { OR: [{ googleId }, { email: cleanEmail }] }
     });
 
     if (!user) {
-      // Register new user via Google
       user = await prisma.user.create({
         data: {
           email: cleanEmail,
-          name: name.trim(),
+          name,
           googleId,
-          avatar: avatar || null,
+          avatar,
           role: assignedRole,
           xp: 0,
           level: 1,
@@ -298,7 +217,7 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
         }
       });
     } else if (!user.googleId) {
-      // Link existing account with Google ID
+      // Link existing account with Google
       user = await prisma.user.update({
         where: { id: user.id },
         data: { googleId, avatar: avatar || user.avatar }
@@ -319,7 +238,8 @@ router.post('/google', async (req: Request, res: Response): Promise<void> => {
       }
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message || 'Login Google gagal.' });
+    console.error('[Auth] Google OAuth error:', err.message);
+    res.status(401).json({ error: 'Verifikasi Google gagal. Coba lagi.' });
   }
 });
 

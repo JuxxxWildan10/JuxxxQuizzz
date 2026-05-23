@@ -97,18 +97,18 @@ export async function loginStudent(name: string): Promise<{ user: User; token: s
   return { user, token: 'offline-student' };
 }
 
-/* ── Google Login (Mock) ── */
+/* ── Google Login (Real OAuth via credential token) ── */
 export async function loginGoogle(
-  googleId: string, email: string, name: string, role: 'GURU' | 'SISWA', avatar?: string
+  credential: string, role: 'GURU' | 'SISWA'
 ): Promise<{ user: User; token: string }> {
   const res = await fetch(`${SOCKET_URL}/api/auth/google`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ googleId, email, name, role, avatar }),
+    body:    JSON.stringify({ credential, role }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? 'Login Google gagal.');
-  
+
   const user: User = {
     name: data.user.name,
     role: data.user.role,

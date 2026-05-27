@@ -12,7 +12,7 @@ model User {
   email         String    @unique
   password      String?
   name          String
-  role          String    @default("SISWA")
+  role          String    @default("SISWA") // SISWA, GURU, ADMIN
   avatar        String?
   xp            Int       @default(0)
   level         Int       @default(1)
@@ -25,6 +25,24 @@ model User {
   achievements  UserAchievement[]
   sessions      Session[]
   tournamentEntries TournamentEntry[]
+  
+  // NEW: B2B Classes
+  teachingClasses Class[] @relation("TeacherClasses")
+  enrolledClasses Class[] @relation("StudentClasses")
+  
+  // NEW: Transactions
+  transactions    Transaction[]
+}
+
+model Class {
+  id          String   @id @default(uuid())
+  name        String
+  schoolId    String?
+  teacherId   String
+  teacher     User     @relation("TeacherClasses", fields: [teacherId], references: [id])
+  students    User[]   @relation("StudentClasses")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Quiz {
@@ -38,6 +56,22 @@ model Quiz {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   isPublic    Boolean  @default(true)
+  
+  // NEW: Monetization
+  price       Int      @default(0)
+  isPremium   Boolean  @default(false)
+  transactions Transaction[]
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  quizId      String?
+  quiz        Quiz?    @relation(fields: [quizId], references: [id])
+  amount      Int
+  status      String   @default("PENDING") // SUCCESS, FAILED
+  createdAt   DateTime @default(now())
 }
 
 model Question {
@@ -66,7 +100,7 @@ model Room {
   code        String   @unique
   quizId      String
   quiz        Quiz     @relation(fields: [quizId], references: [id])
-  mode        String   @default("EXAM")
+  mode        String   @default("EXAM") // EXAM, BATTLE_ROYALE, BOSS_BATTLE
   status      String   @default("WAITING") // WAITING, PLAYING, FINISHED
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

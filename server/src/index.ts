@@ -11,6 +11,8 @@ import quizRoutes from './routes/quiz';
 import leaderboardRoutes from './routes/leaderboard';
 import tournamentRoutes from './routes/tournament';
 import analyticsRoutes from './routes/analytics';
+import classRoutes from './routes/class';
+import transactionRoutes from './routes/transaction';
 
 dotenv.config();
 
@@ -51,6 +53,8 @@ app.use('/api/quizzes', quizRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/tournaments', tournamentRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/classes', classRoutes);
+app.use('/api/transactions', transactionRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'EduBattle Realtime Server is running!' });

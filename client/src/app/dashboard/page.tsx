@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { getUser, logout } from "@/lib/auth";
+import { getUser, logout, getToken } from "@/lib/auth";
 import {
   getQuizzes, saveQuiz, deleteQuiz, uid, SAMPLE_QUIZ,
   type Quiz, type QuizQuestion, type QuizAnswer,

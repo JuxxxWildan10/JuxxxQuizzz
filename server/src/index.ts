@@ -13,6 +13,8 @@ import tournamentRoutes from './routes/tournament';
 import analyticsRoutes from './routes/analytics';
 import classRoutes from './routes/class';
 import transactionRoutes from './routes/transaction';
+import { createClient } from 'redis';
+import { createAdapter } from '@socket.io/redis-adapter';
 
 dotenv.config();
 
@@ -40,6 +42,19 @@ const io = new Server(server, {
     methods: ['GET', 'POST']
   }
 });
+
+// Redis Adapter for Horizontal Scaling (Enterprise B2B)
+if (process.env.REDIS_URL) {
+  const pubClient = createClient({ url: process.env.REDIS_URL });
+  const subClient = pubClient.duplicate();
+
+  Promise.all([pubClient.connect(), subClient.connect()]).then(() => {
+    io.adapter(createAdapter(pubClient, subClient));
+    console.log('Redis Adapter connected for Horizontal Scaling');
+  }).catch(err => {
+    console.error('Redis Adapter connection failed:', err);
+  });
+}
 
 export const prisma = new PrismaClient();
 

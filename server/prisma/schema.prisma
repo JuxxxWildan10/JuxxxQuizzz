@@ -20,6 +20,7 @@ model User {
   googleId      String?   @unique
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  subscriptionTier String @default("FREE") // FREE, PREMIUM, ENTERPRISE
 
   quizzesCreated Quiz[]   @relation("QuizCreator")
   achievements  UserAchievement[]

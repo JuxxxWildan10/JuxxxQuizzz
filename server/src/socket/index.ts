@@ -29,10 +29,23 @@ interface RoomData {
   mode:                 'BOSS_BATTLE' | 'BATTLE_ROYALE' | 'TEAM_BATTLE';
   redScore?:            number; // Team Battle
   blueScore?:           number; // Team Battle
+  maxPlayers:           number; // Monetization Tier Limit
 }
 
 const rooms  = new Map<string, RoomData>();
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
+const tickTimers = new Map<string, ReturnType<typeof setInterval>>();
+
+// Rate limiter state
+const rateLimitMap = new Map<string, number>();
+
+function isRateLimited(socketId: string, limitMs: number = 300): boolean {
+  const lastTime = rateLimitMap.get(socketId) || 0;
+  const now = Date.now();
+  if (now - lastTime < limitMs) return true;
+  rateLimitMap.set(socketId, now);
+  return false;
+}
 
 function genCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -43,6 +56,11 @@ function genCode(): string {
 function clearTimer(code: string) {
   const t = timers.get(code);
   if (t) { clearTimeout(t); timers.delete(code); }
+}
+
+function clearTickTimer(code: string) {
+  const t = tickTimers.get(code);
+  if (t) { clearInterval(t); tickTimers.delete(code); }
 }
 
 function publicRoom(r: RoomData) {
@@ -67,107 +85,91 @@ function calcXP(score: number, rank: number, bossDefeated: boolean): number {
 
 async function persistGameResults(code: string, results: any[], bossDefeated: boolean, cheatingLog: any[]) {
   try {
-    // Update Room status to FINISHED
+    // 1. Update Room status to FINISHED
     const room = await prisma.room.update({
       where: { code },
       data: { status: 'FINISHED' }
     });
 
-    for (const player of results) {
-      const email = `${player.name.toLowerCase().replace(/\s+/g, '_')}@siswa.edubattle.local`;
-      let user = await prisma.user.findUnique({ where: { email } });
-      if (!user) {
-        user = await prisma.user.create({
-          data: {
-            email,
-            name: player.name,
-            role: 'SISWA',
-            xp: 0,
-            level: 1,
-            rank: 'BRONZE'
-          }
-        });
-      }
-
-      const newXP = user.xp + player.xpEarned;
-      const newLevel = Math.max(1, Math.floor(Math.sqrt(newXP / 50)));
-
-      const ranks = [
-        { name: 'BRONZE', minXP: 0 },
-        { name: 'SILVER', minXP: 1000 },
-        { name: 'GOLD', minXP: 5000 },
-        { name: 'PLATINUM', minXP: 15000 },
-        { name: 'MYTHIC', minXP: 50000 },
-      ];
-      const newRank = [...ranks].reverse().find(r => newXP >= r.minXP)?.name ?? 'BRONZE';
-
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          xp: newXP,
-          level: newLevel,
-          rank: newRank
+    // 2. Resolve Users (Upsert) and accumulate their new data
+    // Karena SQLite tidak punya 'createMany' dengan skipDuplicates, kita gunakan $transaction array
+    const upsertUserQueries = results.map(player => {
+      const email = `${player.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}@siswa.edubattle.local`;
+      return prisma.user.upsert({
+        where: { email },
+        update: {
+          xp: { increment: player.xpEarned }
+        },
+        create: {
+          email,
+          name: player.name,
+          role: 'SISWA',
+          xp: player.xpEarned,
+          level: 1,
+          rank: 'BRONZE'
         }
       });
+    });
 
+    // Jalankan semua upsert user secara bersamaan
+    const savedUsers = await prisma.$transaction(upsertUserQueries);
+
+    // 3. Update Level/Rank & Prepare Sessions + Analytics
+    const rankUpdates: any[] = [];
+    const sessionCreates: any[] = [];
+    const achievementsCreates: any[] = [];
+
+    const ranks = [
+      { name: 'BRONZE', minXP: 0 },
+      { name: 'SILVER', minXP: 1000 },
+      { name: 'GOLD', minXP: 5000 },
+      { name: 'PLATINUM', minXP: 15000 },
+      { name: 'MYTHIC', minXP: 50000 },
+    ];
+
+    savedUsers.forEach((user, index) => {
+      const player = results[index]; // Same order
+      const newLevel = Math.max(1, Math.floor(Math.sqrt(user.xp / 50)));
+      const newRank = [...ranks].reverse().find(r => user.xp >= r.minXP)?.name ?? 'BRONZE';
+
+      // Queue Rank/Level update if changed
+      if (user.level !== newLevel || user.rank !== newRank) {
+        rankUpdates.push(
+          prisma.user.update({
+            where: { id: user.id },
+            data: { level: newLevel, rank: newRank }
+          })
+        );
+      }
+
+      // Queue Session & Analytics
       const cheatCount = cheatingLog.filter(c => c.name === player.name).length;
+      sessionCreates.push(
+        prisma.session.create({
+          data: {
+            userId: user.id,
+            roomId: room.id,
+            score: player.score,
+            combo: player.combo,
+            analytics: {
+              create: {
+                correctCount: player.correctCount,
+                wrongCount: player.wrongCount,
+                avgTime: 0,
+                cheatingAttempts: cheatCount
+              }
+            }
+          }
+        })
+      );
+    });
 
-      const session = await prisma.session.create({
-        data: {
-          userId: user.id,
-          roomId: room.id,
-          score: player.score,
-          combo: player.combo,
-        }
-      });
+    // Execute session and rank updates in one transaction block
+    await prisma.$transaction([...rankUpdates, ...sessionCreates]);
+    console.log(`[RoomDB ${code}] Batched game results persisted successfully for ${results.length} players.`);
 
-      await prisma.analytics.create({
-        data: {
-          sessionId: session.id,
-          correctCount: player.correctCount,
-          wrongCount: player.wrongCount,
-          avgTime: 0,
-          cheatingAttempts: cheatCount
-        }
-      });
-
-      // --- SERVER-SIDE ACHIEVEMENT VERIFICATION ---
-      const achievementsToUnlock: string[] = [];
-      if (player.maxCombo >= 10) achievementsToUnlock.push('combo-10');
-      if (player.score >= 5000) achievementsToUnlock.push('score-5000');
-      if (player.correctCount >= 10 && player.wrongCount === 0) achievementsToUnlock.push('perfect-10');
-
-      for (const achId of achievementsToUnlock) {
-        // Ensure achievement exists in DB
-        let ach = await prisma.achievement.findFirst({ where: { condition: achId } });
-        if (!ach) {
-          let title = '', desc = '', icon = '';
-          if (achId === 'combo-10') { title = 'Combo Master'; desc = 'Mencapai 10 combo beruntun'; icon = '🔥'; }
-          if (achId === 'score-5000') { title = 'High Scorer'; desc = 'Mendapatkan 5000 skor dalam satu game'; icon = '🏆'; }
-          if (achId === 'perfect-10') { title = 'Perfectionist'; desc = 'Menjawab 10 benar tanpa salah'; icon = '⭐'; }
-          
-          ach = await prisma.achievement.create({
-            data: { title, description: desc, icon, condition: achId }
-          });
-        }
-        
-        // Check if user already has it
-        const hasAch = await prisma.userAchievement.findFirst({
-          where: { userId: user.id, achievementId: ach.id }
-        });
-        
-        if (!hasAch) {
-          await prisma.userAchievement.create({
-            data: { userId: user.id, achievementId: ach.id }
-          });
-          console.log(`[Achievement] ${user.name} unlocked ${achId}!`);
-        }
-      }
-
-    }
-    console.log(`[RoomDB ${code}] Game results persisted successfully.`);
   } catch (err) {
-    console.error(`[RoomDB ${code}] Error persisting game results:`, err);
+    console.error(`[RoomDB ${code}] Error persisting batched game results:`, err);
   }
 }
 
@@ -180,6 +182,7 @@ function sendQuestion(io: Server, code: string) {
 
   if (r.currentQuestionIndex >= r.questions.length || (r.mode === 'BATTLE_ROYALE' && activePlayers.length === 0)) {
     // Game over
+    clearTickTimer(code);
     r.status = 'FINISHED';
     const sorted = Object.entries(r.players).sort(([,a],[,b]) => b.score - a.score);
     const bossDefeated = r.mode === 'BOSS_BATTLE' ? r.bossHp <= 0 : true;
@@ -299,21 +302,35 @@ export function setupSocketHandlers(io: Server) {
       const code = genCode();
       const qs   = questions && questions.length > 0 ? questions : DEFAULT_QUESTIONS;
       const resolvedMode = mode || 'BOSS_BATTLE';
-      rooms.set(code, {
-        hostId: socket.id, bossHp: 500 * qs.length, maxBossHp: 500 * qs.length, // Initial value
-        players: {}, spectators: new Set(), status: 'WAITING',
-        currentQuestionIndex: 0, questions: qs,
-        answeredThisRound: new Set(), wrongThisRound: 0, cheatingLog: [],
-        mode: resolvedMode,
-        redScore: resolvedMode === 'TEAM_BATTLE' ? 0 : undefined,
-        blueScore: resolvedMode === 'TEAM_BATTLE' ? 0 : undefined,
-      });
-      socket.join(code);
-      socket.emit('room_created', { roomCode: code });
-      console.log(`[Room ${code}] created in ${resolvedMode} mode (${qs.length} questions)`);
+      const resolvedQuizId = quizId && !quizId.startsWith('sample-') ? quizId : 'sample-1';
 
+      let maxPlayers = 50; // FREE Tier default limit
       try {
-        const resolvedQuizId = quizId && !quizId.startsWith('sample-') ? quizId : 'sample-1';
+        if (resolvedQuizId !== 'sample-1') {
+          const quiz = await prisma.quiz.findUnique({
+            where: { id: resolvedQuizId },
+            include: { creator: true }
+          });
+          if (quiz && ((quiz.creator as any).subscriptionTier === 'PREMIUM' || (quiz.creator as any).subscriptionTier === 'ENTERPRISE')) {
+            maxPlayers = 400; // PREMIUM/ENTERPRISE Tier limit
+          }
+        }
+
+        rooms.set(code, {
+          hostId: socket.id, bossHp: 500 * qs.length, maxBossHp: 500 * qs.length, // Initial value
+          players: {}, spectators: new Set(), status: 'WAITING',
+          currentQuestionIndex: 0, questions: qs,
+          answeredThisRound: new Set(), wrongThisRound: 0, cheatingLog: [],
+          mode: resolvedMode,
+          redScore: resolvedMode === 'TEAM_BATTLE' ? 0 : undefined,
+          blueScore: resolvedMode === 'TEAM_BATTLE' ? 0 : undefined,
+          maxPlayers,
+        });
+
+        socket.join(code);
+        socket.emit('room_created', { roomCode: code, maxPlayers });
+        console.log(`[Room ${code}] created in ${resolvedMode} mode (${qs.length} questions, max: ${maxPlayers})`);
+
         await prisma.room.create({
           data: {
             code,
@@ -336,6 +353,12 @@ export function setupSocketHandlers(io: Server) {
       if (!rooms.has(code)) { socket.emit('error', { message: `Room "${code}" tidak ditemukan.` }); return; }
 
       const r = rooms.get(code)!;
+
+      if (Object.keys(r.players).length >= r.maxPlayers && !r.players[socket.id]) {
+        socket.emit('error', { message: `Room penuh! (Batas: ${r.maxPlayers} pemain). Minta host untuk upgrade ke Premium.` });
+        return;
+      }
+
       socket.join(code);
 
       // Determine team in Team Battle
@@ -390,6 +413,15 @@ export function setupSocketHandlers(io: Server) {
       r.maxBossHp = playerCount * 500 * r.questions.length;
       r.bossHp = r.maxBossHp;
 
+      // Optimasi: Gunakan tick timer untuk broadcast update state ke semua player secara berkala (1 detik), bukan setiap kali ada yang submit jawaban.
+      clearTickTimer(code);
+      tickTimers.set(code, setInterval(() => {
+        const roomData = rooms.get(code);
+        if (roomData && roomData.status === 'PLAYING') {
+          io.to(code).emit('room_update', publicRoom(roomData));
+        }
+      }, 1000));
+
       io.to(code).emit('room_update', publicRoom(r));
       sendQuestion(io, code);
       console.log(`[Room ${code}] Game started with dynamically scaled boss HP: ${r.bossHp}`);
@@ -399,6 +431,11 @@ export function setupSocketHandlers(io: Server) {
     socket.on('submit_answer', ({
       roomCode, answerId, timeTaken,
     }: { roomCode: string; answerId: string; timeTaken: number }) => {
+      // 🚦 Rate Limiting: Prevent spamming / Auto-Clickers
+      if (isRateLimited(socket.id, 500)) {
+        return; // Drop if sent faster than 500ms
+      }
+
       const code   = roomCode?.trim().toUpperCase();
       const r      = rooms.get(code);
       if (!r || r.status !== 'PLAYING') return;
@@ -458,7 +495,7 @@ export function setupSocketHandlers(io: Server) {
         });
       }
 
-      io.to(code).emit('room_update', publicRoom(r));
+      // Optimasi: Dihapus io.to(code).emit('room_update', publicRoom(r)) untuk mencegah lag N^2. Update state sekarang dihandle oleh interval 1 detik di start_game.
 
       // All active players answered → advance early
       const activeCount = Object.values(r.players).filter(p => !p.eliminated).length;
@@ -490,13 +527,16 @@ export function setupSocketHandlers(io: Server) {
 
     /* Disconnect */
     socket.on('disconnect', () => {
+      rateLimitMap.delete(socket.id); // Clean up rate limit state
       rooms.forEach((r, code) => {
         r.spectators.delete(socket.id);
         if (r.players[socket.id]) {
           delete r.players[socket.id];
           io.to(code).emit('room_update', publicRoom(r));
           if (Object.keys(r.players).length === 0 && r.spectators.size === 0) {
-            clearTimer(code); rooms.delete(code);
+            clearTimer(code); 
+            clearTickTimer(code);
+            rooms.delete(code);
             console.log(`[Room ${code}] empty — removed`);
           }
         }

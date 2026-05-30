@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { getUser, logout, getToken } from "@/lib/auth";
 import {
-  getQuizzes, saveQuiz, deleteQuiz, uid, SAMPLE_QUIZ,
+  getQuizzes, saveQuiz, deleteQuiz, uid,
   type Quiz, type QuizQuestion, type QuizAnswer,
 } from "@/lib/quizStore";
 import { socket } from "@/lib/socket";
@@ -17,7 +17,7 @@ function blankQuestion(): QuizQuestion {
     answers: [blankAnswer(), blankAnswer(), blankAnswer(), blankAnswer()] };
 }
 function blankQuiz(): Quiz {
-  return { id: uid(), title: "", createdAt: new Date().toISOString(), questions: [blankQuestion()] };
+  return { id: uid(), title: "", createdAt: new Date().toISOString(), mode: 'BOSS_BATTLE', questions: [blankQuestion()] };
 }
 
 export default function DashboardPage() {
@@ -35,24 +35,31 @@ export default function DashboardPage() {
   const [aiTopic,       setAiTopic]       = useState("");
   const [aiCount,       setAiCount]       = useState(5);
   const [showAiModal,   setShowAiModal]   = useState(false);
-  const [selectedMode,  setSelectedMode]  = useState<'BOSS_BATTLE' | 'BATTLE_ROYALE' | 'TEAM_BATTLE'>('BOSS_BATTLE');
 
   const refresh = useCallback(async () => {
     try {
       const qs = await getQuizzes();
       setQuizzes(qs);
     } catch (err: any) {
+      if (err.message?.toLowerCase().includes("akses ditolak") || err.message?.toLowerCase().includes("token")) {
+        logout();
+        router.replace("/login");
+        return;
+      }
       setError(err.message || "Gagal memuat kuis.");
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     const u = getUser();
-    if (!u) { router.push("/login"); return; }
-    if (u.role !== "GURU") { router.push("/login"); return; }
-    setUser_(u);
-    
-    refresh();
+    if (!u || u.role !== "GURU") { 
+      router.replace("/login"); 
+      return; 
+    }
+    setTimeout(() => {
+      setUser_(u);
+      refresh();
+    }, 0);
 
     socket.connect();
     socket.on("connect",    () => setConnected(true));
@@ -73,7 +80,7 @@ export default function DashboardPage() {
   const deployQuiz = (quiz: Quiz) => {
     if (!connected) { setError("Server belum terhubung."); return; }
     setDeploying(quiz.id); setDeployedId(quiz.id); setLastCode("");
-    socket.emit("create_room", { questions: quiz.questions, quizId: quiz.id, mode: selectedMode });
+    socket.emit("create_room", { questions: quiz.questions, quizId: quiz.id, mode: quiz.mode });
   };
 
   const saveEditing = async () => {
@@ -88,8 +95,8 @@ export default function DashboardPage() {
       await refresh();
       setEditing(null);
       setError("");
-    } catch (err: any) {
-      setError(err.message || "Gagal menyimpan kuis.");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Gagal menyimpan kuis.");
     }
   };
 
@@ -143,8 +150,8 @@ export default function DashboardPage() {
       // Optionally trigger refresh so the list shows the newly saved quiz
       refresh();
       setAiTopic(""); // Reset topic field
-    } catch (e: any) {
-      setError(e.message || "Gagal memproses pembuatan kuis AI.");
+    } catch (e: unknown) {
+      setError((e as Error).message || "Gagal memproses pembuatan kuis AI.");
     } finally {
       setAiGenerating(false);
     }
@@ -201,17 +208,20 @@ export default function DashboardPage() {
         </AnimatePresence>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
           {[
-            { label:"Quiz Dibuat",  value:quizzes.length,                                       color:"neon-text-cyan"   },
-            { label:"Total Soal",   value:quizzes.reduce((s,q) => s + q.questions.length, 0),   color:"neon-text-pink"   },
-            { label:"Arena Aktif",  value:lastCode ? 1 : 0,                                      color:"text-[#00d4ff]"   },
-            { label:"Mode",         value:"GURU",                                                color:"text-[#f5e642]"   },
+            { label:"Kuis Tersimpan", value:quizzes.length,                                       icon:"📚", color:"#00d4ff" },
+            { label:"Total Bank Soal",value:quizzes.reduce((s,q) => s + q.questions.length, 0),   icon:"📝", color:"#f5e642" },
+            { label:"Arena Aktif",    value:lastCode ? 1 : 0,                                      icon:"⚔️", color:"#ff2a6d" },
+            { label:"Status Akses",   value:"ADMIN",                                               icon:"🛡️", color:"#a855f7" },
           ].map((c, i) => (
-            <motion.div key={c.label} initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }}
-              transition={{ delay: i * 0.07 }} className="glass-panel p-5">
-              <p className="text-[#546e7a] text-xs font-bold mb-1 uppercase tracking-wider">{c.label}</p>
-              <p className={`text-3xl font-bold font-['Orbitron'] ${c.color}`}>{c.value}</p>
+            <motion.div key={c.label} initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay: i * 0.08 }}
+              whileHover={{ y:-4, scale:1.02 }}
+              className="glass-panel p-5 relative overflow-hidden group cursor-default" style={{ borderColor: `${c.color}30` }}>
+              <div className="absolute top-0 left-0 w-1 h-full" style={{ backgroundColor: c.color }} />
+              <div className="absolute -right-4 -bottom-4 text-6xl opacity-10 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-500">{c.icon}</div>
+              <p className="text-[#546e7a] text-[10px] font-bold mb-2 uppercase tracking-[0.2em]">{c.label}</p>
+              <p className="text-3xl font-bold font-['Orbitron']" style={{ color: c.color, textShadow: `0 0 15px ${c.color}50` }}>{c.value}</p>
             </motion.div>
           ))}
         </div>
@@ -224,85 +234,94 @@ export default function DashboardPage() {
           {quizzes.length === 0 ? (
             <p className="text-[#546e7a] text-center py-10">Belum ada kuis. Klik &quot;+ BUAT QUIZ&quot;!</p>
           ) : (
-            <div className="space-y-3">
-              {quizzes.map(quiz => (
-                <motion.div key={quiz.id} layout
-                  className="flex flex-col sm:flex-row justify-between items-start sm:items-center
-                    bg-[#0d1a2e]/60 p-4 rounded-xl border border-[#00d4ff]/10
-                    hover:border-[#00d4ff]/30 transition gap-3">
-                  <div>
-                    <h4 className="text-white font-bold">{quiz.title}</h4>
-                    <p className="text-xs text-[#546e7a] mt-1">
-                      {quiz.questions.length} soal &bull; {new Date(quiz.createdAt).toLocaleDateString("id-ID")}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {quizzes.map((quiz, i) => (
+                <motion.div key={quiz.id} layout initial={{ opacity:0, scale:0.95 }} animate={{ opacity:1, scale:1 }} transition={{ delay: i*0.05 }}
+                  className="flex flex-col justify-between bg-black/40 p-5 rounded-xl border border-white/10
+                    hover:border-[#00d4ff]/40 hover:bg-[#00d4ff]/5 transition-all group relative overflow-hidden">
+                  
+                  {/* Active Indicator Bg */}
+                  {deployedId === quiz.id && <div className="absolute inset-0 bg-green-500/5 pointer-events-none" />}
+                  
+                  <div className="mb-4 relative z-10">
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="text-white font-bold text-lg leading-tight group-hover:text-[#00d4ff] transition-colors">{quiz.title}</h4>
+                      <span className="text-[9px] text-[#00d4ff] border border-[#00d4ff]/30 bg-[#00d4ff]/10 px-2 py-1 rounded font-bold font-['Orbitron'] whitespace-nowrap ml-3">
+                        {quiz.mode?.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#546e7a] flex items-center gap-2">
+                      <span>📝 {quiz.questions.length} soal</span>
+                      <span>•</span>
+                      <span>📅 {new Date(quiz.createdAt).toLocaleDateString("id-ID")}</span>
                     </p>
-                    {deployedId === quiz.id && lastCode && (
-                      <div className="mt-2 flex items-center gap-2 flex-wrap">
-                        <span className="text-xs text-[#546e7a]">Kode Arena:</span>
-                        <span className="font-['Orbitron'] font-bold text-[#00d4ff] text-sm tracking-widest
-                          bg-[#0d1a2e] px-3 py-1 rounded border border-[#00d4ff]/40 neon-border-cyan">
-                          {lastCode}
-                        </span>
-                        <button onClick={() => setShareRoomCode(lastCode)}
-                          className="text-xs text-[#00d4ff] hover:text-white px-2.5 py-1 rounded bg-[#00d4ff]/15 border border-[#00d4ff]/40 transition font-bold font-['Orbitron']">
-                          📡 SHARE
-                        </button>
-                        <a href={`/dashboard/live?code=${lastCode}`} target="_blank"
-                          className="text-xs text-[#ff2a6d] hover:text-[#ff4d88] px-2.5 py-1 rounded bg-[#ff2a6d]/15 border border-[#ff2a6d]/40 transition font-bold font-['Orbitron']">
-                          📡 LIVE MONITOR
-                        </a>
-                        <a href={`/battle?code=${lastCode}`} target="_blank"
-                          className="text-xs text-[#f5e642] hover:text-[#ffe800] px-2 py-1 rounded bg-[#f5e642]/10 hover:bg-[#f5e642]/20 transition">
-                          ⚔️ Buka Arena
-                        </a>
+                    <div className="mt-3 p-3 bg-black/50 rounded-lg border border-white/5 flex flex-col gap-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-[#546e7a] font-bold uppercase tracking-widest">KODE ARENA</span>
+                        {deployedId === quiz.id ? (
+                          <span className="text-[10px] bg-green-500/20 text-green-400 border border-green-500/50 px-2 py-0.5 rounded font-bold animate-pulse flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 bg-green-400 rounded-full" /> LIVE
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-[#546e7a]">OFFLINE</span>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <div className="mb-4 bg-[#0d1a2e]/60 rounded-xl p-3 border border-white/5 w-full">
-                    <p className="text-[#546e7a] text-[10px] font-bold font-['Orbitron'] tracking-wider mb-2 uppercase">🎮 PILIH MODE PERMAINAN</p>
-                    <div className="flex gap-2">
-                      {[
-                        { id: 'BOSS_BATTLE', name: 'Boss Battle 🐉', desc: 'Kooperatif serang Naga' },
-                        { id: 'BATTLE_ROYALE', name: 'Battle Royale 👑', desc: 'Last Man Standing (3 HP)' },
-                        { id: 'TEAM_BATTLE', name: 'Team Battle 🔴🔵', desc: 'Merah vs Biru' }
-                      ].map((m) => (
-                        <button
-                          key={m.id}
-                          onClick={() => setSelectedMode(m.id as any)}
-                          type="button"
-                          className={`flex-1 p-2 rounded text-xs font-bold transition border text-center flex flex-col justify-center items-center gap-1
-                            ${selectedMode === m.id
-                              ? "bg-[#00d4ff]/10 text-[#00d4ff] border-[#00d4ff] shadow-[0_0_10px_rgba(0,212,255,0.2)]"
-                              : "bg-transparent text-[#546e7a] border-white/10 hover:border-white/20 hover:text-white"}`}
-                        >
-                          <span>{m.name}</span>
-                          <span className="text-[9px] opacity-60 font-normal">{m.desc}</span>
-                        </button>
-                      ))}
+                      
+                      {quiz.roomCode ? (
+                        <div className="flex items-center gap-2">
+                          <span className="font-['Orbitron'] font-bold text-[#00d4ff] text-lg tracking-[0.2em] mr-auto">
+                            {quiz.roomCode}
+                          </span>
+                          <button onClick={() => setShareRoomCode(quiz.roomCode!)} title="Share Code"
+                            className="text-lg hover:scale-110 transition bg-white/5 p-1.5 rounded-lg border border-white/10 hover:border-[#00d4ff]/50">
+                            📡
+                          </button>
+                          <a href={`/dashboard/live?code=${quiz.roomCode}`} target="_blank" title="Live Monitor"
+                            className="text-lg hover:scale-110 transition bg-white/5 p-1.5 rounded-lg border border-white/10 hover:border-[#ff2a6d]/50">
+                            📊
+                          </a>
+                          <a href={`/battle?code=${quiz.roomCode}`} target="_blank" title="Masuk Arena"
+                            className="text-lg hover:scale-110 transition bg-white/5 p-1.5 rounded-lg border border-white/10 hover:border-[#f5e642]/50">
+                            ⚔️
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-[#546e7a] italic">Belum pernah di-deploy.</div>
+                      )}
                     </div>
                   </div>
+                  <div className="mb-4">
+                    <span className="text-xs text-[#00d4ff] border border-[#00d4ff]/30 bg-[#00d4ff]/10 px-2 py-1 rounded font-bold font-['Orbitron']">
+                      MODE: {quiz.mode?.replace('_', ' ')}
+                    </span>
+                  </div>
 
-                  <div className="flex gap-2 flex-wrap">
-                    <motion.button whileTap={{ scale:0.95 }} onClick={() => deployQuiz(quiz)}
+                  <div className="flex gap-2 relative z-10 mt-auto pt-4 border-t border-white/5">
+                    <motion.button whileHover={{ scale:1.02 }} whileTap={{ scale:0.95 }} onClick={() => deployQuiz(quiz)}
                       disabled={deploying === quiz.id}
-                      className="text-sm px-4 py-2 rounded font-bold border border-[#00d4ff] text-[#00d4ff]
-                        hover:bg-[#00d4ff] hover:text-[#050508] transition disabled:opacity-50 font-['Orbitron'] text-xs tracking-wider">
-                      {deploying === quiz.id ? "⏳ Deploy..." : "🚀 DEPLOY"}
+                      className={`flex-1 text-[11px] py-2.5 rounded-lg font-bold border transition-all disabled:opacity-50 font-['Orbitron'] tracking-wider
+                        ${deployedId === quiz.id 
+                          ? "bg-green-500/10 border-green-500/50 text-green-400 hover:bg-green-500 hover:text-[#050508]" 
+                          : "bg-[#00d4ff]/10 border-[#00d4ff]/40 text-[#00d4ff] hover:bg-[#00d4ff] hover:text-[#050508]"}`}>
+                      {deploying === quiz.id ? "⏳ DEPLOYING..." : deployedId === quiz.id ? "🔄 RESTART" : "🚀 DEPLOY"}
                     </motion.button>
-                    <button onClick={() => setEditing({ ...quiz })}
-                      className="text-sm px-3 py-2 rounded border border-white/10 text-[#a8bfd0] hover:text-white hover:border-white/30 transition">
-                      ✏️ Edit
-                    </button>
-                    <button onClick={async () => {
-                      try {
-                        await deleteQuiz(quiz.id);
-                        await refresh();
-                      } catch (err: any) {
-                        setError(err.message || "Gagal menghapus kuis.");
+                    <motion.button whileHover={{ scale:1.05 }} whileTap={{ scale:0.95 }} onClick={() => setEditing({ ...quiz })}
+                      className="px-3 py-2.5 rounded-lg border border-white/10 bg-white/5 text-[#a8bfd0] hover:text-white hover:border-white/30 transition-all">
+                      ✏️
+                    </motion.button>
+                    <motion.button whileHover={{ scale:1.05, backgroundColor:"rgba(255,42,109,0.15)" }} whileTap={{ scale:0.95 }} onClick={async () => {
+                      if (confirm(`Yakin hapus kuis "${quiz.title}"?`)) {
+                        try {
+                          await deleteQuiz(quiz.id);
+                          await refresh();
+                        } catch (err: unknown) {
+                          setError((err as Error).message || "Gagal menghapus kuis.");
+                        }
                       }
                     }}
-                      className="text-sm px-3 py-2 rounded border border-[#ff2a6d]/30 text-[#ff2a6d] hover:bg-[#ff2a6d]/10 transition">
+                      className="px-3 py-2.5 rounded-lg border border-[#ff2a6d]/20 text-[#ff2a6d] transition-all">
                       🗑️
-                    </button>
+                    </motion.button>
                   </div>
                 </motion.div>
               ))}
@@ -345,7 +364,6 @@ export default function DashboardPage() {
                   className="text-[#546e7a] hover:text-white text-2xl leading-none">✕</button>
               </div>
 
-              {/* Title Input + AI Generator */}
               <div className="flex gap-3 mb-5 items-end flex-wrap sm:flex-nowrap">
                 <div className="flex-1 min-w-[200px]">
                   <label className="text-[10px] font-bold text-[#00d4ff] uppercase tracking-widest mb-1.5 block">Judul Kuis</label>
@@ -354,6 +372,15 @@ export default function DashboardPage() {
                     placeholder:text-[#546e7a]"
                     placeholder="Contoh: Ulangan Fisika Bab 3"
                     value={editing.title} onChange={e => setEditing({ ...editing, title: e.target.value })} />
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <label className="text-[10px] font-bold text-[#00d4ff] uppercase tracking-widest mb-1.5 block">Mode Permainan</label>
+                  <select className="w-full bg-[#0d1a2e]/80 border border-[#00d4ff]/30 rounded-lg p-3 text-white focus:outline-none focus:border-[#00d4ff] transition"
+                    value={editing.mode} onChange={e => setEditing({ ...editing, mode: e.target.value as 'BOSS_BATTLE' | 'BATTLE_ROYALE' | 'TEAM_BATTLE' })}>
+                    <option value="BOSS_BATTLE">Boss Battle 🐉</option>
+                    <option value="BATTLE_ROYALE">Battle Royale 👑</option>
+                    <option value="TEAM_BATTLE">Team Battle 🔴🔵</option>
+                  </select>
                 </div>
                 <button type="button" onClick={() => setShowAiModal(true)}
                   className="p-3 bg-[#f5e642] hover:bg-[#ffe800] text-[#050508] font-bold rounded-lg text-xs transition

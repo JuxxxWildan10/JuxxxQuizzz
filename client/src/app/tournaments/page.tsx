@@ -57,14 +57,14 @@ export default function TournamentsPage() {
       if (!res.ok) throw new Error("Gagal memuat turnamen");
       const data = await res.json();
       setTournaments(data);
-    } catch (err: any) {
-      setError(err.message || "Terjadi kesalahan");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Terjadi kesalahan");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { loadTournaments(); }, [loadTournaments]);
+  useEffect(() => { setTimeout(() => loadTournaments(), 0); }, [loadTournaments]);
 
   const handleJoin = async (tournament: Tournament) => {
     if (!user) { setError("Login terlebih dahulu."); return; }
@@ -85,8 +85,8 @@ export default function TournamentsPage() {
       if (!res.ok) throw new Error(data.error || "Gagal bergabung");
       setJoinMsg({ id: tournament.id, msg: "✅ Berhasil terdaftar! Mainkan sesi practice untuk meningkatkan skor.", ok: true });
       loadTournaments();
-    } catch (err: any) {
-      setJoinMsg({ id: tournament.id, msg: `❌ ${err.message}`, ok: false });
+    } catch (err: unknown) {
+      setJoinMsg({ id: tournament.id, msg: `❌ ${(err as Error).message}`, ok: false });
     } finally {
       setJoining(null);
     }
@@ -111,8 +111,8 @@ export default function TournamentsPage() {
       setNewTitle(""); setNewDesc(""); setNewStart(""); setNewEnd("");
       setError("");
       loadTournaments();
-    } catch (err: any) {
-      setError(err.message || "Terjadi kesalahan");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Terjadi kesalahan");
     } finally {
       setCreating(false);
     }

@@ -12,6 +12,8 @@ interface PlayerData {
   lives?: number;          // Battle Royale
   eliminated?: boolean;     // Battle Royale
   team?: 'RED' | 'BLUE';    // Team Battle
+  connected: boolean;
+  socketId: string;
 }
 
 interface RoomData {
@@ -30,6 +32,8 @@ interface RoomData {
   redScore?:            number; // Team Battle
   blueScore?:           number; // Team Battle
   maxPlayers:           number; // Monetization Tier Limit
+  questionStartTime?:   number;
+  socketToPlayer:       Record<string, string>; // Mapping socketId -> playerId
 }
 
 const rooms  = new Map<string, RoomData>();
@@ -178,7 +182,7 @@ function sendQuestion(io: Server, code: string) {
   if (!r || r.status !== 'PLAYING') return;
 
   // Filter out eliminated players in Battle Royale
-  const activePlayers = Object.entries(r.players).filter(([_, p]) => r.mode !== 'BATTLE_ROYALE' || !p.eliminated);
+  const activePlayers = Object.entries(r.players).filter(([_, p]) => r.mode !== 'BATTLE_ROYALE' || (!p.eliminated && p.connected));
 
   if (r.currentQuestionIndex >= r.questions.length || (r.mode === 'BATTLE_ROYALE' && activePlayers.length === 0)) {
     // Game over
@@ -218,6 +222,8 @@ function sendQuestion(io: Server, code: string) {
     total: r.questions.length,
   });
 
+  r.questionStartTime = Date.now(); // ANTI-CHEAT: Server tracks time
+
   clearTimer(code);
   timers.set(code, setTimeout(() => advanceQuestion(io, code), (q.timeLimit + 1) * 1000));
 }
@@ -236,8 +242,8 @@ function advanceQuestion(io: Server, code: string) {
 
   // Deduct lives for active players who did not answer or answered incorrectly in Battle Royale
   if (r.mode === 'BATTLE_ROYALE') {
-    Object.entries(r.players).forEach(([sid, p]) => {
-      if (!p.eliminated && !r.answeredThisRound.has(sid)) {
+    Object.entries(r.players).forEach(([pid, p]) => {
+      if (!p.eliminated && p.connected && !r.answeredThisRound.has(pid)) {
         p.combo = 0;
         p.lives = Math.max(0, (p.lives || 3) - 1);
         if (p.lives === 0) {
@@ -266,7 +272,7 @@ function advanceQuestion(io: Server, code: string) {
   io.to(code).emit('room_update', publicRoom(r));
 
   // Check if everyone is eliminated in Battle Royale
-  const activePlayers = Object.values(r.players).filter(p => !p.eliminated);
+  const activePlayers = Object.values(r.players).filter(p => p.connected && !p.eliminated);
   if (r.mode === 'BATTLE_ROYALE' && activePlayers.length === 0) {
     sendQuestion(io, code);
   } else {
@@ -299,7 +305,7 @@ export function setupSocketHandlers(io: Server) {
 
     /* Teacher creates room with quiz */
     socket.on('create_room', async ({ questions, quizId, mode }: { questions?: QuizQuestion[]; quizId?: string; mode?: 'BOSS_BATTLE' | 'BATTLE_ROYALE' | 'TEAM_BATTLE' }) => {
-      const code = genCode();
+      let code = '';
       const qs   = questions && questions.length > 0 ? questions : DEFAULT_QUESTIONS;
       const resolvedMode = mode || 'BOSS_BATTLE';
       const resolvedQuizId = quizId && !quizId.startsWith('sample-') ? quizId : 'sample-1';
@@ -311,13 +317,28 @@ export function setupSocketHandlers(io: Server) {
             where: { id: resolvedQuizId },
             include: { creator: true }
           });
-          if (quiz && ((quiz.creator as any).subscriptionTier === 'PREMIUM' || (quiz.creator as any).subscriptionTier === 'ENTERPRISE')) {
-            maxPlayers = 400; // PREMIUM/ENTERPRISE Tier limit
+          if (quiz) {
+            code = quiz.roomCode || genCode();
+            if (((quiz.creator as any).subscriptionTier === 'PREMIUM' || (quiz.creator as any).subscriptionTier === 'ENTERPRISE')) {
+              maxPlayers = 400; // PREMIUM/ENTERPRISE Tier limit
+            }
+          } else {
+            code = genCode();
           }
+        } else {
+          code = 'DEMO12';
+        }
+
+        // ✅ FIX: Jika room sudah ada di memory (misal sisa deploy lama), bersihkan timer
+        // dan buat ulang dengan state WAITING yang bersih.
+        if (rooms.has(code)) {
+          clearTimer(code);
+          clearTickTimer(code);
+          console.log(`[Room ${code}] Re-deploying — resetting existing room to WAITING.`);
         }
 
         rooms.set(code, {
-          hostId: socket.id, bossHp: 500 * qs.length, maxBossHp: 500 * qs.length, // Initial value
+          hostId: socket.id, bossHp: 500 * qs.length, maxBossHp: 500 * qs.length,
           players: {}, spectators: new Set(), status: 'WAITING',
           currentQuestionIndex: 0, questions: qs,
           answeredThisRound: new Set(), wrongThisRound: 0, cheatingLog: [],
@@ -325,66 +346,169 @@ export function setupSocketHandlers(io: Server) {
           redScore: resolvedMode === 'TEAM_BATTLE' ? 0 : undefined,
           blueScore: resolvedMode === 'TEAM_BATTLE' ? 0 : undefined,
           maxPlayers,
+          socketToPlayer: {},
         });
 
         socket.join(code);
         socket.emit('room_created', { roomCode: code, maxPlayers });
         console.log(`[Room ${code}] created in ${resolvedMode} mode (${qs.length} questions, max: ${maxPlayers})`);
 
-        await prisma.room.create({
-          data: {
-            code,
-            quizId: resolvedQuizId,
-            status: 'WAITING',
-            mode: resolvedMode,
-          },
-        });
-        console.log(`[RoomDB ${code}] Persisted to database.`);
+        // Skip DB persist untuk demo room — tidak ada quiz valid di database
+        if (resolvedQuizId !== 'sample-1') {
+          await prisma.room.upsert({
+            where: { code },
+            update: {
+              status: 'WAITING',
+              mode: resolvedMode,
+              quizId: resolvedQuizId,
+            },
+            create: {
+              code,
+              quizId: resolvedQuizId,
+              status: 'WAITING',
+              mode: resolvedMode,
+            },
+          });
+          console.log(`[RoomDB ${code}] Persisted to database.`);
+        } else {
+          console.log(`[Room ${code}] Demo room — skipping DB persist.`);
+        }
       } catch (err) {
         console.error(`[RoomDB ${code}] Error saving room to DB:`, err);
+        socket.emit('error', { message: 'Gagal membuat room. Coba lagi.' });
       }
     });
 
     /* Player joins room */
-    socket.on('join_room', ({ roomCode, playerName }: { roomCode: string; playerName: string }) => {
+    socket.on('join_room', async ({ roomCode, playerName, mode }: { roomCode: string; playerName: string; mode?: string }) => {
       const code = roomCode?.trim().toUpperCase();
       const name = playerName?.trim().slice(0, 24);
       if (!code || !name) { socket.emit('error', { message: 'Data tidak valid.' }); return; }
-      if (!rooms.has(code)) { socket.emit('error', { message: `Room "${code}" tidak ditemukan.` }); return; }
+
+      // ✅ FIX: Jika room tidak ada di memory, coba restore dari database (e.g. setelah server restart)
+      if (!rooms.has(code)) {
+        try {
+          const dbRoom = await prisma.room.findUnique({
+            where: { code },
+            include: { quiz: { include: { questions: { include: { answers: true } } } } }
+          });
+
+          if (dbRoom && dbRoom.status === 'WAITING' && dbRoom.quiz) {
+            // Rebuild room di memory dari data DB
+            const qs: QuizQuestion[] = dbRoom.quiz.questions.map((q: any) => ({
+              id: q.id, text: q.text, timeLimit: q.timeLimit,
+              answers: q.answers.map((a: any) => ({ id: a.id, text: a.text, isCorrect: a.isCorrect }))
+            }));
+            const resolvedMode = (dbRoom.mode || 'BOSS_BATTLE') as 'BOSS_BATTLE' | 'BATTLE_ROYALE' | 'TEAM_BATTLE';
+            rooms.set(code, {
+              hostId: '', bossHp: 500 * qs.length, maxBossHp: 500 * qs.length,
+              players: {}, spectators: new Set(), status: 'WAITING',
+              currentQuestionIndex: 0, questions: qs,
+              answeredThisRound: new Set(), wrongThisRound: 0, cheatingLog: [],
+              mode: resolvedMode,
+              redScore: resolvedMode === 'TEAM_BATTLE' ? 0 : undefined,
+              blueScore: resolvedMode === 'TEAM_BATTLE' ? 0 : undefined,
+              maxPlayers: 50,
+              socketToPlayer: {},
+            });
+            console.log(`[Room ${code}] Auto-restored from DB for player ${name}`);
+          } else {
+            socket.emit('error', { message: `Room "${code}" tidak ditemukan. Minta guru untuk deploy ulang.` });
+            return;
+          }
+        } catch (err) {
+          console.error(`[Room ${code}] Error restoring from DB:`, err);
+          socket.emit('error', { message: `Room "${code}" tidak ditemukan.` });
+          return;
+        }
+      }
 
       const r = rooms.get(code)!;
-
-      if (Object.keys(r.players).length >= r.maxPlayers && !r.players[socket.id]) {
-        socket.emit('error', { message: `Room penuh! (Batas: ${r.maxPlayers} pemain). Minta host untuk upgrade ke Premium.` });
+      
+      if (mode && r.mode !== mode) {
+        socket.emit('error', { message: `Mode tidak cocok! Room ini menggunakan mode ${r.mode.replace('_', ' ')}.` });
         return;
+      }
+
+      if (Object.keys(r.players).length >= r.maxPlayers && !r.socketToPlayer[socket.id]) {
+        // Also check if they are just reconnecting
+        const checkPid = name.toLowerCase().trim();
+        if (!r.players[checkPid]) {
+          socket.emit('error', { message: `Room penuh! (Batas: ${r.maxPlayers} pemain). Minta host untuk upgrade ke Premium.` });
+          return;
+        }
       }
 
       socket.join(code);
 
-      // Determine team in Team Battle
-      let assignedTeam: 'RED' | 'BLUE' | undefined = undefined;
-      if (r.mode === 'TEAM_BATTLE') {
-        const redCount = Object.values(r.players).filter(p => p.team === 'RED').length;
-        const blueCount = Object.values(r.players).filter(p => p.team === 'BLUE').length;
-        assignedTeam = redCount <= blueCount ? 'RED' : 'BLUE';
+      const playerId = name.toLowerCase().trim();
+      r.socketToPlayer[socket.id] = playerId;
+
+      if (r.players[playerId]) {
+        // RECONNECT / SESSION RESURRECTION
+        r.players[playerId].connected = true;
+        r.players[playerId].socketId = socket.id;
+        console.log(`[Room ${code}] ${name} reconnected (Resurrected Session)`);
+      } else {
+        // NEW PLAYER
+        // Determine team in Team Battle
+        let assignedTeam: 'RED' | 'BLUE' | undefined = undefined;
+        if (r.mode === 'TEAM_BATTLE') {
+          const redCount = Object.values(r.players).filter(p => p.team === 'RED').length;
+          const blueCount = Object.values(r.players).filter(p => p.team === 'BLUE').length;
+          assignedTeam = redCount <= blueCount ? 'RED' : 'BLUE';
+        }
+
+        r.players[playerId] = {
+          name, score: 0, combo: 0, maxCombo: 0,
+          shield: 500, maxShield: 500,
+          correctCount: 0, wrongCount: 0, fastAnswers: 0,
+          lives: r.mode === 'BATTLE_ROYALE' ? 3 : undefined,
+          eliminated: r.mode === 'BATTLE_ROYALE' ? false : undefined,
+          team: assignedTeam,
+          connected: true,
+          socketId: socket.id,
+        };
+        console.log(`[Room ${code}] ${name} joined (${Object.keys(r.players).length} players) in team: ${assignedTeam}`);
       }
 
-      r.players[socket.id] = {
-        name, score: 0, combo: 0, maxCombo: 0,
-        shield: 500, maxShield: 500,
-        correctCount: 0, wrongCount: 0, fastAnswers: 0,
-        lives: r.mode === 'BATTLE_ROYALE' ? 3 : undefined,
-        eliminated: r.mode === 'BATTLE_ROYALE' ? false : undefined,
-        team: assignedTeam,
-      };
       io.to(code).emit('room_update', publicRoom(r));
-      console.log(`[Room ${code}] ${name} joined (${Object.keys(r.players).length} players) in team: ${assignedTeam}`);
     });
 
     /* Spectator (teacher) watches without playing */
-    socket.on('watch_room', ({ roomCode }: { roomCode: string }) => {
+    socket.on('watch_room', async ({ roomCode }: { roomCode: string }) => {
       const code = roomCode?.trim().toUpperCase();
-      if (!rooms.has(code)) { socket.emit('error', { message: `Room "${code}" tidak ditemukan.` }); return; }
+      if (!rooms.has(code)) {
+        // Coba restore dari DB
+        try {
+          const dbRoom = await prisma.room.findUnique({
+            where: { code },
+            include: { quiz: { include: { questions: { include: { answers: true } } } } }
+          });
+          if (dbRoom && dbRoom.quiz) {
+            const qs: QuizQuestion[] = dbRoom.quiz.questions.map((q: any) => ({
+              id: q.id, text: q.text, timeLimit: q.timeLimit,
+              answers: q.answers.map((a: any) => ({ id: a.id, text: a.text, isCorrect: a.isCorrect }))
+            }));
+            const resolvedMode = (dbRoom.mode || 'BOSS_BATTLE') as 'BOSS_BATTLE' | 'BATTLE_ROYALE' | 'TEAM_BATTLE';
+            rooms.set(code, {
+              hostId: '', bossHp: 500 * qs.length, maxBossHp: 500 * qs.length,
+              players: {}, spectators: new Set(), status: 'WAITING',
+              currentQuestionIndex: 0, questions: qs,
+              answeredThisRound: new Set(), wrongThisRound: 0, cheatingLog: [],
+              mode: resolvedMode,
+              redScore: resolvedMode === 'TEAM_BATTLE' ? 0 : undefined,
+              blueScore: resolvedMode === 'TEAM_BATTLE' ? 0 : undefined,
+              maxPlayers: 50,
+              socketToPlayer: {},
+            });
+          } else {
+            socket.emit('error', { message: `Room "${code}" tidak ditemukan.` }); return;
+          }
+        } catch {
+          socket.emit('error', { message: `Room "${code}" tidak ditemukan.` }); return;
+        }
+      }
       const r = rooms.get(code)!;
       socket.join(code);
       r.spectators.add(socket.id);
@@ -439,16 +563,23 @@ export function setupSocketHandlers(io: Server) {
       const code   = roomCode?.trim().toUpperCase();
       const r      = rooms.get(code);
       if (!r || r.status !== 'PLAYING') return;
-      if (r.answeredThisRound.has(socket.id)) return;
 
-      const player = r.players[socket.id];
-      if (!player || player.eliminated) return;
+      const playerId = r.socketToPlayer[socket.id];
+      if (!playerId) return;
+
+      if (r.answeredThisRound.has(playerId)) return;
+
+      const player = r.players[playerId];
+      if (!player || player.eliminated || !player.connected) return;
       
-      r.answeredThisRound.add(socket.id);
+      r.answeredThisRound.add(playerId);
 
       const q        = r.questions[r.currentQuestionIndex];
       const correct  = q?.answers.find(a => a.id === answerId)?.isCorrect ?? false;
-      const clamped  = Math.min(Math.max(Number(timeTaken) || 0, 0), q?.timeLimit ?? 30);
+      
+      // ANTI-CHEAT: Calculate time on server side! Ignore client's timeTaken.
+      const serverTimeTaken = (Date.now() - (r.questionStartTime || Date.now())) / 1000;
+      const clamped  = Math.min(Math.max(serverTimeTaken, 0), q?.timeLimit ?? 30);
       const isFast   = clamped < 3;
 
       if (correct) {
@@ -471,7 +602,7 @@ export function setupSocketHandlers(io: Server) {
         }
 
         io.to(code).emit('player_attack', {
-          playerId: socket.id, playerName: player.name,
+          playerId: player.socketId, playerName: player.name,
           damage, bossHp: r.bossHp, isCorrect: true,
         });
 
@@ -490,7 +621,7 @@ export function setupSocketHandlers(io: Server) {
         }
 
         io.to(code).emit('player_attack', {
-          playerId: socket.id, playerName: player.name,
+          playerId: player.socketId, playerName: player.name,
           damage: 0, bossHp: r.bossHp, isCorrect: false,
         });
       }
@@ -498,7 +629,7 @@ export function setupSocketHandlers(io: Server) {
       // Optimasi: Dihapus io.to(code).emit('room_update', publicRoom(r)) untuk mencegah lag N^2. Update state sekarang dihandle oleh interval 1 detik di start_game.
 
       // All active players answered → advance early
-      const activeCount = Object.values(r.players).filter(p => !p.eliminated).length;
+      const activeCount = Object.values(r.players).filter(p => p.connected && !p.eliminated).length;
       if (r.answeredThisRound.size >= activeCount) {
         advanceQuestion(io, code);
       }
@@ -515,14 +646,15 @@ export function setupSocketHandlers(io: Server) {
     socket.on('report_cheat', ({ roomCode, type }: { roomCode: string; type: string }) => {
       const code = roomCode?.trim().toUpperCase();
       const r    = rooms.get(code);
-      if (!r || !r.players[socket.id]) return;
+      const playerId = r?.socketToPlayer[socket.id];
+      if (!r || !playerId || !r.players[playerId]) return;
       r.cheatingLog.push({
         socketId: socket.id,
-        name: r.players[socket.id].name,
+        name: r.players[playerId].name,
         type, time: new Date().toISOString(),
       });
       io.to(code).emit('room_update', publicRoom(r));
-      console.log(`[Room ${code}] CHEAT: ${r.players[socket.id].name} — ${type}`);
+      console.log(`[Room ${code}] CHEAT: ${r.players[playerId].name} — ${type}`);
     });
 
     /* Disconnect */
@@ -530,15 +662,35 @@ export function setupSocketHandlers(io: Server) {
       rateLimitMap.delete(socket.id); // Clean up rate limit state
       rooms.forEach((r, code) => {
         r.spectators.delete(socket.id);
-        if (r.players[socket.id]) {
-          delete r.players[socket.id];
-          io.to(code).emit('room_update', publicRoom(r));
-          if (Object.keys(r.players).length === 0 && r.spectators.size === 0) {
-            clearTimer(code); 
-            clearTickTimer(code);
-            rooms.delete(code);
-            console.log(`[Room ${code}] empty — removed`);
+        const playerId = r.socketToPlayer[socket.id];
+        
+        if (playerId && r.players[playerId]) {
+          r.players[playerId].connected = false;
+          delete r.socketToPlayer[socket.id];
+          console.log(`[Room ${code}] ${r.players[playerId].name} disconnected`);
+
+          // DYNAMIC BOSS HP: Scale down if someone disconnects permanently during PLAYING
+          if (r.status === 'PLAYING' && r.mode === 'BOSS_BATTLE') {
+            const activeCount = Object.values(r.players).filter(p => p.connected && !p.eliminated).length;
+            const newMax = Math.max(1, activeCount) * 500 * r.questions.length;
+            if (newMax < r.maxBossHp) {
+              const hpRatio = r.bossHp / r.maxBossHp;
+              r.maxBossHp = newMax;
+              r.bossHp = Math.max(1, Math.floor(r.maxBossHp * hpRatio));
+              console.log(`[Room ${code}] Boss HP dynamically scaled down to ${r.bossHp}/${r.maxBossHp}`);
+            }
           }
+
+          io.to(code).emit('room_update', publicRoom(r));
+        }
+
+        // Clean up empty room
+        const hasActivePlayers = Object.values(r.players).some(p => p.connected);
+        if (!hasActivePlayers && r.spectators.size === 0) {
+          clearTimer(code); 
+          clearTickTimer(code);
+          rooms.delete(code);
+          console.log(`[Room ${code}] empty — removed`);
         }
       });
       console.log(`[-] ${socket.id}`);

@@ -41,7 +41,7 @@ function LiveMonitorInner() {
       ["connect","disconnect","room_update","error"].forEach(e => socket.off(e));
       socket.disconnect();
     };
-  }, [roomCode]);
+  }, [roomCode, router]);
 
   const sorted = room ? Object.entries(room.players)
     .sort(([,a],[,b]) => b.score - a.score) : [];
@@ -107,6 +107,18 @@ function LiveMonitorInner() {
                 <span className="text-[#00d4ff] font-bold">{sorted.length}</span>
               </div>
             </div>
+
+            {room.status === "WAITING" && (
+              <div className="mt-6">
+                <motion.button whileHover={{ scale:1.04 }} whileTap={{ scale:0.97 }}
+                  onClick={() => socket.emit("start_game", { roomCode })}
+                  className="w-full py-4 rounded-xl font-bold font-['Orbitron'] text-sm tracking-wider relative overflow-hidden"
+                  style={{ background:"linear-gradient(135deg, #ff2a6d, #ff6b9d)", color:"#fff", boxShadow:"0 0 30px rgba(255,42,109,0.4)" }}>
+                  <motion.div className="absolute inset-0 bg-white/20" initial={{ x:"-100%" }} whileHover={{ x:"100%" }} transition={{ duration:0.5 }} />
+                  🚀 MULAI BATTLE SEKARANG
+                </motion.button>
+              </div>
+            )}
           </div>
 
           {/* Leaderboard */}

@@ -74,34 +74,35 @@ export default function LoginPage() {
         className="glass-panel p-8 w-full max-w-md relative z-10">
 
         {/* Logo */}
-        <div className="text-center mb-6">
-          <div className="w-14 h-14 rounded-xl border border-[#00d4ff]/40 bg-[#00d4ff]/10 flex items-center
-            justify-center mx-auto mb-3 shadow-[0_0_20px_rgba(0,212,255,0.25)]">
-            <span className="text-2xl">🐉</span>
-          </div>
-          <h1 className="text-2xl font-bold font-['Orbitron'] tracking-wider">
+        <div className="text-center mb-8">
+          <motion.div animate={{ y:[0,-8,0] }} transition={{ repeat:Infinity, duration:3, ease:"easeInOut" }}
+            className="w-16 h-16 rounded-2xl border-2 border-[#00d4ff]/40 bg-black/40 flex items-center
+            justify-center mx-auto mb-4 shadow-[0_0_30px_rgba(0,212,255,0.2)]">
+            <span className="text-3xl">🐉</span>
+          </motion.div>
+          <h1 className="text-3xl font-bold font-['Orbitron'] tracking-wider mb-1">
             <span className="text-white">EDU</span><span className="neon-text-cyan">BATTLE</span>
           </h1>
-          <p className="text-[#546e7a] text-xs mt-1">Platform belajar gamified terbaik</p>
+          <p className="text-[#00d4ff] text-[10px] font-bold tracking-[0.2em] uppercase">Advanced Learning Platform</p>
         </div>
 
         {/* Tabs */}
-        <div className="flex rounded-lg overflow-hidden border border-[#00d4ff]/20 mb-6 text-[10px]">
+        <div className="flex p-1 rounded-xl bg-black/40 border border-white/10 mb-8 relative z-10">
           {([
-            { key:"SISWA",      label:"🎮 Siswa"      },
-            { key:"LOGIN_GURU", label:"👨‍🏫 Login Guru"  },
-            { key:"DAFTAR_GURU",label:"✏️ Daftar Guru" },
-          ] as const).map(t => (
-            <button key={t.key} onClick={() => switchTab(t.key)}
-              className={`flex-1 py-2.5 font-bold font-['Orbitron'] tracking-wider transition-all
-                ${tab === t.key
-                  ? t.key === "SISWA"
-                    ? "bg-[#00d4ff] text-[#050508]"
-                    : "bg-[#f5e642] text-[#050508]"
-                  : "bg-transparent text-[#546e7a] hover:text-[#a8bfd0] hover:bg-white/5"}`}>
-              {t.label}
-            </button>
-          ))}
+            { key:"SISWA",      label:"🎮 SISWA", color:"#00d4ff" },
+            { key:"LOGIN_GURU", label:"👨‍🏫 GURU",  color:"#f5e642" },
+            { key:"DAFTAR_GURU",label:"✏️ DAFTAR",color:"#ff2a6d" },
+          ] as const).map(t => {
+            const isActive = tab === t.key;
+            return (
+              <button key={t.key} onClick={() => switchTab(t.key)}
+                className={`flex-1 py-2.5 font-bold font-['Orbitron'] text-[10px] tracking-widest transition-all rounded-lg
+                  ${isActive ? "shadow-lg" : "text-[#546e7a] hover:text-[#a8bfd0] hover:bg-white/5"}`}
+                style={isActive ? { backgroundColor: `${t.color}20`, color: t.color, border: `1px solid ${t.color}50` } : { border: "1px solid transparent" }}>
+                {t.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Error */}
@@ -121,15 +122,18 @@ export default function LoginPage() {
             <motion.div key="siswa" initial={{ opacity:0, x:-10 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0, x:10 }}
               className="space-y-4">
               <div>
-                <label className="text-[10px] font-bold text-[#00d4ff] uppercase tracking-widest mb-1.5 block">Nama Hero</label>
-                <input className="w-full bg-[#0d1a2e]/80 border border-[#00d4ff]/30 rounded-lg p-3 text-white
-                  focus:outline-none focus:border-[#00d4ff] transition placeholder:text-[#546e7a]"
-                  placeholder="Masukkan nama hero kamu" value={form.name}
+                <label className="text-[10px] font-bold text-[#00d4ff] uppercase tracking-[0.2em] mb-2 block">NAMA HERO</label>
+                <input className="w-full bg-black/40 border-2 border-[#00d4ff]/30 rounded-xl p-4 text-white
+                  focus:outline-none focus:border-[#00d4ff] focus:shadow-[0_0_15px_rgba(0,212,255,0.25)] transition-all placeholder:text-[#546e7a]"
+                  placeholder="Siapa nama legendamu?" value={form.name}
                   onChange={e => set("name", e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleSubmit()}
                   maxLength={24} autoFocus />
               </div>
-              <p className="text-xs text-[#546e7a]">Siswa tidak perlu password — cukup nama untuk bergabung arena.</p>
+              <div className="bg-[#00d4ff]/10 border border-[#00d4ff]/20 rounded-lg p-3 text-center">
+                <p className="text-[10px] font-bold font-['Orbitron'] text-[#00d4ff] tracking-widest">TIDAK PERLU PASSWORD</p>
+                <p className="text-[10px] text-[#a8bfd0] mt-1">Cukup masukkan nama untuk bergabung ke arena.</p>
+              </div>
             </motion.div>
           )}
 
@@ -199,12 +203,18 @@ export default function LoginPage() {
         {/* Submit */}
         <motion.button whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
           onClick={handleSubmit} disabled={loading}
-          className={`mt-6 w-full py-3 font-bold rounded-lg transition-all font-['Orbitron'] text-sm
-            tracking-widest disabled:opacity-50 disabled:cursor-not-allowed
-            ${tab === "SISWA"
-              ? "bg-[#00d4ff] hover:bg-[#33e5ff] text-[#050508] neon-border-cyan"
-              : "bg-[#f5e642] hover:bg-[#ffe800] text-[#050508] neon-border-pink"}`}>
-          {loading ? "⏳ MEMUAT..." : tab === "SISWA" ? "MASUK ARENA" : tab === "LOGIN_GURU" ? "LOGIN" : "DAFTAR SEKARANG"}
+          className={`mt-8 w-full py-4 font-bold rounded-xl transition-all font-['Orbitron'] text-sm
+            tracking-widest disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden text-[#050508]`}
+          style={{ 
+            background: tab === "SISWA" ? "linear-gradient(135deg, #00d4ff, #0080ff)" 
+                       : tab === "LOGIN_GURU" ? "linear-gradient(135deg, #f5e642, #d4a000)" 
+                       : "linear-gradient(135deg, #ff2a6d, #ff6b9d)",
+            boxShadow: tab === "SISWA" ? "0 0 25px rgba(0,212,255,0.4)" 
+                      : tab === "LOGIN_GURU" ? "0 0 25px rgba(245,230,66,0.3)" 
+                      : "0 0 25px rgba(255,42,109,0.4)"
+          }}>
+          <motion.div className="absolute inset-0 bg-white/20" initial={{ x:"-100%" }} whileHover={{ x:"100%" }} transition={{ duration:0.5 }} />
+          {loading ? "⏳ MEMUAT..." : tab === "SISWA" ? "⚔️ MASUK ARENA" : tab === "LOGIN_GURU" ? "🚀 LOGIN SISTEM" : "✨ DAFTAR SEKARANG"}
         </motion.button>
 
         {/* Hints */}

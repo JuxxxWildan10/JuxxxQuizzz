@@ -18,9 +18,11 @@ export default function NavBar() {
   const [menuOpen,  setMenuOpen] = useState(false);
 
   useEffect(() => {
-    setUser_(getUser());
-    const p = getProgress();
-    setXp(p.xp); setLevel(p.level);
+    setTimeout(() => {
+      setUser_(getUser());
+      const p = getProgress();
+      setXp(p.xp); setLevel(p.level);
+    }, 0);
   }, [pathname]);
 
   const handleLogout = () => {

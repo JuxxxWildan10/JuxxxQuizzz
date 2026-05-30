@@ -57,6 +57,9 @@ model Quiz {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   isPublic    Boolean  @default(true)
+  mode        String   @default("BOSS_BATTLE") // BOSS_BATTLE, BATTLE_ROYALE, TEAM_BATTLE
+  roomCode    String?  @unique
+  
   
   // NEW: Monetization
   price       Int      @default(0)

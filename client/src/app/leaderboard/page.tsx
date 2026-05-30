@@ -13,15 +13,6 @@ interface LeaderboardPlayer {
   avatar: string;
   streak: number;
 }
-
-const MOCK: LeaderboardPlayer[] = [
-  { rank:1,  name:"Andi Wijaya",    score:45200, level:12, tier:"MYTHIC",   avatar:"🦁", streak:7 },
-  { rank:2,  name:"Siti Rahayu",    score:38750, level:10, tier:"PLATINUM", avatar:"🐯", streak:5 },
-  { rank:3,  name:"Budi Santoso",   score:31400, level:9,  tier:"PLATINUM", avatar:"🦊", streak:3 },
-  { rank:4,  name:"Dewi Putri",     score:28900, level:8,  tier:"GOLD",     avatar:"🐺", streak:4 },
-  { rank:5,  name:"Reza Pratama",   score:24300, level:7,  tier:"GOLD",     avatar:"🦅", streak:2 },
-];
-
 const TIER_COLOR: Record<string,string> = {
   MYTHIC:"text-[#ff2a6d]", PLATINUM:"text-[#00d4ff]", GOLD:"text-[#f5e642]",
   SILVER:"text-gray-300",  BRONZE:"text-amber-600",
@@ -42,25 +33,13 @@ export default function LeaderboardPage() {
         const res = await fetch(`${SOCKET_URL}/api/leaderboard`);
         if (res.ok) {
           const data = await res.json();
-          // Pad with mock data if there are too few players
-          if (data.length > 0) {
-            let list = [...data];
-            if (list.length < 5) {
-              const filler = MOCK.slice(list.length).map((m, idx) => ({
-                ...m,
-                rank: list.length + idx + 1
-              }));
-              list = [...list, ...filler];
-            }
-            setLeaderboard(list);
-            return;
-          }
+          setLeaderboard(data || []);
+          return;
         }
       } catch (err) {
         console.error("Gagal memuat papan peringkat:", err);
       }
-      // Fallback
-      setLeaderboard(MOCK);
+      setLeaderboard([]);
     }
     loadData().finally(() => setLoading(false));
   }, []);
@@ -142,34 +121,41 @@ export default function LeaderboardPage() {
                 text-[10px] font-bold text-[#546e7a] uppercase tracking-widest font-['Orbitron']">
                 <span>#</span><span>Warrior</span><span className="hidden sm:block">Tier</span><span>Score</span>
               </div>
-              <div className="divide-y divide-white/5">
-                {leaderboard.map((p, i) => (
-                  <motion.div key={p.name + p.rank}
-                    initial={{ opacity:0, x:-10 }} animate={{ opacity:1, x:0 }} transition={{ delay:0.05*i }}
-                    className="grid grid-cols-[auto,1fr,auto,auto] gap-x-4 px-5 py-3.5 items-center
-                      hover:bg-[#00d4ff]/5 transition">
-                    <span className={`font-bold font-['Orbitron'] text-sm w-6 text-center
-                      ${i===0?"text-[#f5e642]":i===1?"text-gray-300":i===2?"text-amber-600":"text-[#546e7a]"}`}>
-                      {p.rank}
-                    </span>
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-2xl shrink-0">{p.avatar}</span>
-                      <div className="min-w-0">
-                        <p className="text-white font-bold text-sm truncate">{p.name}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[10px] text-[#546e7a]">Lv.{p.level}</span>
-                          {p.streak > 0 && <span className="text-[10px] text-[#f5e642]">🔥 {p.streak}</span>}
+              
+              {leaderboard.length === 0 ? (
+                <div className="text-center py-12 text-[#546e7a] text-sm">
+                  Belum ada warrior di papan peringkat. Mulai battle untuk menjadi yang pertama!
+                </div>
+              ) : (
+                <div className="divide-y divide-white/5">
+                  {leaderboard.map((p, i) => (
+                    <motion.div key={p.name + p.rank}
+                      initial={{ opacity:0, x:-10 }} animate={{ opacity:1, x:0 }} transition={{ delay:0.05*i }}
+                      className="grid grid-cols-[auto,1fr,auto,auto] gap-x-4 px-5 py-3.5 items-center
+                        hover:bg-[#00d4ff]/5 transition">
+                      <span className={`font-bold font-['Orbitron'] text-sm w-6 text-center
+                        ${i===0?"text-[#f5e642]":i===1?"text-gray-300":i===2?"text-amber-600":"text-[#546e7a]"}`}>
+                        {p.rank}
+                      </span>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-2xl shrink-0">{p.avatar}</span>
+                        <div className="min-w-0">
+                          <p className="text-white font-bold text-sm truncate">{p.name}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] text-[#546e7a]">Lv.{p.level}</span>
+                            {p.streak > 0 && <span className="text-[10px] text-[#f5e642]">🔥 {p.streak}</span>}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="hidden sm:flex items-center gap-1">
-                      <span className="text-sm">{TIER_ICON[p.tier] || "🛡️"}</span>
-                      <span className={`text-[10px] font-bold font-['Orbitron'] ${TIER_COLOR[p.tier] || "text-gray-300"}`}>{p.tier}</span>
-                    </div>
-                    <span className="font-mono text-[#00d4ff] font-bold text-sm">{p.score.toLocaleString()}</span>
-                  </motion.div>
-                ))}
-              </div>
+                      <div className="hidden sm:flex items-center gap-1">
+                        <span className="text-sm">{TIER_ICON[p.tier] || "🛡️"}</span>
+                        <span className={`text-[10px] font-bold font-['Orbitron'] ${TIER_COLOR[p.tier] || "text-gray-300"}`}>{p.tier}</span>
+                      </div>
+                      <span className="font-mono text-[#00d4ff] font-bold text-sm">{p.score.toLocaleString()}</span>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
             </motion.div>
           </>
         )}

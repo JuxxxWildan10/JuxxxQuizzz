@@ -4,7 +4,7 @@ const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000'
 
 export interface QuizAnswer   { id?: string; text: string; isCorrect: boolean; }
 export interface QuizQuestion { id?: string; text: string; answers: QuizAnswer[]; timeLimit: number; }
-export interface Quiz         { id: string; title: string; questions: QuizQuestion[]; createdAt: string; }
+export interface Quiz         { id: string; title: string; questions: QuizQuestion[]; createdAt: string; mode: 'BOSS_BATTLE' | 'BATTLE_ROYALE' | 'TEAM_BATTLE'; roomCode?: string; }
 
 export async function getQuizzes(): Promise<Quiz[]> {
   const token = getToken();
@@ -18,7 +18,7 @@ export async function getQuizzes(): Promise<Quiz[]> {
       throw new Error(data.error || 'Gagal memuat kuis.');
     }
     return await res.json();
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[QuizStore] Error fetching quizzes:', err);
     throw err;
   }
@@ -39,7 +39,7 @@ export async function saveQuiz(quiz: Quiz): Promise<Quiz> {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ title: quiz.title, questions: quiz.questions })
+        body: JSON.stringify({ title: quiz.title, questions: quiz.questions, mode: quiz.mode })
       });
       if (res.ok) {
         return await res.json();
@@ -56,7 +56,7 @@ export async function saveQuiz(quiz: Quiz): Promise<Quiz> {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`
     },
-    body: JSON.stringify({ title: quiz.title, questions: quiz.questions })
+    body: JSON.stringify({ title: quiz.title, questions: quiz.questions, mode: quiz.mode })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Gagal menyimpan kuis.');
@@ -87,6 +87,7 @@ export function uid(): string {
 export const SAMPLE_QUIZ: Quiz = {
   id: 'sample-1',
   title: 'Demo: Pengetahuan Umum',
+  mode: 'BOSS_BATTLE',
   createdAt: new Date().toISOString(),
   questions: [
     { id:'q1', text:'Ibu kota Prancis adalah?', timeLimit:30, answers:[

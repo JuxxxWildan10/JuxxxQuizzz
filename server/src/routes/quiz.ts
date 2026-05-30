@@ -2,6 +2,11 @@ import { Router, Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../index';
 
+function genCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || 'edubattle-super-secret-2025';
 
 interface AuthRequest extends Request {
@@ -45,6 +50,17 @@ router.get('/', requireTeacher, async (req: AuthRequest, res: Response): Promise
       },
       orderBy: { createdAt: 'desc' }
     });
+
+    // Auto-heal: Ensure all returned quizzes have a roomCode
+    let updated = false;
+    for (const quiz of quizzes) {
+      if (!quiz.roomCode) {
+        quiz.roomCode = genCode();
+        await prisma.quiz.update({ where: { id: quiz.id }, data: { roomCode: quiz.roomCode } });
+        updated = true;
+      }
+    }
+
     res.json(quizzes);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Gagal memuat kuis.' });
@@ -53,7 +69,7 @@ router.get('/', requireTeacher, async (req: AuthRequest, res: Response): Promise
 
 /* POST /api/quizzes — Create a new quiz */
 router.post('/', requireTeacher, async (req: AuthRequest, res: Response): Promise<void> => {
-  const { title, questions } = req.body as { title: string; questions: any[] };
+  const { title, questions, mode } = req.body as { title: string; questions: any[]; mode?: string };
   if (!title?.trim() || !Array.isArray(questions) || questions.length === 0) {
     res.status(400).json({ error: 'Data kuis tidak lengkap.' }); return;
   }
@@ -62,6 +78,8 @@ router.post('/', requireTeacher, async (req: AuthRequest, res: Response): Promis
     const quiz = await prisma.quiz.create({
       data: {
         title: title.trim(),
+        mode: mode || 'BOSS_BATTLE',
+        roomCode: genCode(),
         creatorId: req.user!.id,
         questions: {
           create: questions.map(q => ({
@@ -91,7 +109,7 @@ router.post('/', requireTeacher, async (req: AuthRequest, res: Response): Promis
 /* PUT /api/quizzes/:id — Update an existing quiz */
 router.put('/:id', requireTeacher, async (req: AuthRequest, res: Response): Promise<void> => {
   const id = req.params.id as string;
-  const { title, questions } = req.body as { title: string; questions: any[] };
+  const { title, questions, mode } = req.body as { title: string; questions: any[]; mode?: string };
   if (!title?.trim() || !Array.isArray(questions) || questions.length === 0) {
     res.status(400).json({ error: 'Data kuis tidak lengkap.' }); return;
   }
@@ -125,6 +143,7 @@ router.put('/:id', requireTeacher, async (req: AuthRequest, res: Response): Prom
         where: { id },
         data: {
           title: title.trim(),
+          mode: mode || 'BOSS_BATTLE',
           questions: {
             create: questions.map(q => ({
               text: q.text,
@@ -169,8 +188,32 @@ router.delete('/:id', requireTeacher, async (req: AuthRequest, res: Response): P
       });
       const qIds = questionIds.map(q => q.id);
 
+      // 1. Delete answers and questions
       await tx.answer.deleteMany({ where: { questionId: { in: qIds } } });
       await tx.question.deleteMany({ where: { quizId: id } });
+
+      // 2. Cascade delete Rooms -> Sessions -> Analytics
+      const rooms = await tx.room.findMany({ where: { quizId: id }, select: { id: true } });
+      const roomIds = rooms.map(r => r.id);
+      
+      if (roomIds.length > 0) {
+        const sessions = await tx.session.findMany({ where: { roomId: { in: roomIds } }, select: { id: true } });
+        const sessionIds = sessions.map(s => s.id);
+        
+        if (sessionIds.length > 0) {
+          await tx.analytics.deleteMany({ where: { sessionId: { in: sessionIds } } });
+          await tx.session.deleteMany({ where: { roomId: { in: roomIds } } });
+        }
+        await tx.room.deleteMany({ where: { quizId: id } });
+      }
+
+      // 3. Unlink Transactions
+      await tx.transaction.updateMany({
+        where: { quizId: id },
+        data: { quizId: null }
+      });
+
+      // 4. Finally delete the quiz
       await tx.quiz.delete({ where: { id } });
     });
 

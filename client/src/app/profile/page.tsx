@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { getUser, logout, verifyToken, type User } from "@/lib/auth";
+import { logout, verifyToken, type User } from "@/lib/auth";
 import {
   getProgress, xpToNextLevel, xpProgress, getRank,
   ACHIEVEMENTS, type UserProgress,
@@ -30,7 +30,7 @@ export default function ProfilePage() {
         router.push("/login");
       }
     });
-    setProgress(getProgress());
+    setTimeout(() => setProgress(getProgress()), 0);
   }, [router]);
 
   if (!user || !progress) return null;

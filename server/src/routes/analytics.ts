@@ -65,7 +65,7 @@ router.get('/teacher', requireTeacher, async (req: AuthRequest, res: Response): 
         completedAt: room.updatedAt,
         studentCount,
         cheatingCount,
-        topScore: Math.max(0, ...room.sessions.map(s => s.score)),
+        topScore: room.sessions.length > 0 ? Math.max(...room.sessions.map(s => s.score)) : 0,
         avgScore: studentCount ? room.sessions.reduce((sum, s) => sum + s.score, 0) / studentCount : 0
       };
     });

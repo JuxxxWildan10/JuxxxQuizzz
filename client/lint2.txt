@@ -1,0 +1,56 @@
+
+D:\game-interaktif\client\src\app\dashboard\page.tsx
+  54:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\game-interaktif\client\src\app\dashboard\page.tsx:54:5
+  52 |     setTimeout(() => setUser_(u), 0);
+  53 |     
+> 54 |     refresh();
+     |     ^^^^^^^ Avoid calling setState() directly within an effect
+  55 |
+  56 |     socket.connect();
+  57 |     socket.on("connect",    () => setConnected(true));  react-hooks/set-state-in-effect
+
+D:\game-interaktif\client\src\app\tournaments\page.tsx
+  67:21  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\game-interaktif\client\src\app\tournaments\page.tsx:67:21
+  65 |   }, []);
+  66 |
+> 67 |   useEffect(() => { loadTournaments(); }, [loadTournaments]);
+     |                     ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  68 |
+  69 |   const handleJoin = async (tournament: Tournament) => {
+  70 |     if (!user) { setError("Login terlebih dahulu."); return; }  react-hooks/set-state-in-effect
+
+D:\game-interaktif\client\src\components\NavBar.tsx
+  23:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\game-interaktif\client\src\components\NavBar.tsx:23:5
+  21 |     setTimeout(() => setUser_(getUser()), 0);
+  22 |     const p = getProgress();
+> 23 |     setXp(p.xp); setLevel(p.level);
+     |     ^^^^^ Avoid calling setState() directly within an effect
+  24 |   }, [pathname]);
+  25 |
+  26 |   const handleLogout = () => {  react-hooks/set-state-in-effect
+
+✖ 3 problems (3 errors, 0 warnings)

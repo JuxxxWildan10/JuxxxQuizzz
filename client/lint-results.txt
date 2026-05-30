@@ -1,0 +1,137 @@
+
+D:\game-interaktif\client\src\app\battle\page.tsx
+   36:9   warning  'router' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+   87:12  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\game-interaktif\client\src\app\battle\page.tsx:87:12
+  85 |   useEffect(() => {
+  86 |     const u = getUser();
+> 87 |     if (u) setPlayerName(u.name);
+     |            ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  88 |
+  89 |     socket.connect();
+  90 |     socket.on("connect",    () => setConnected(true));  react-hooks/set-state-in-effect
+  257:58  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-explicit-any
+  377:70  error    Error: Cannot call impure function during render
+
+`Math.random` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+D:\game-interaktif\client\src\app\battle\page.tsx:377:70
+  375 |             <motion.div key={fe.id}
+  376 |               initial={{ opacity: 0, y: "100vh", scale: 0.4 }}
+> 377 |               animate={{ opacity: 1, y: "-10vh", scale: 1.4, rotate: Math.random() * 60 - 30 }}
+      |                                                                      ^^^^^^^^^^^^^ Cannot call impure function
+  378 |               exit={{ opacity: 0 }}
+  379 |               transition={{ duration: 2.8, ease: "easeOut" }}
+  380 |               className="absolute text-5xl"                                                                                                                                                   react-hooks/purity
+  396:20  error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+D:\game-interaktif\client\src\app\battle\page.tsx:396:20
+  394 |         <div className="w-full flex justify-between items-center mt-2 mb-3 relative z-10">
+  395 |           <div className="glass-panel px-3 py-1.5 text-xs font-bold font-['Orbitron'] text-[#00d4ff] border border-[#00d4ff]/20">
+> 396 |             ROOM: {codeRef.current}
+      |                    ^^^^^^^^^^^^^^^ Cannot access ref value during render
+  397 |           </div>
+  398 |           {qTotal > 0 && (
+  399 |             <div className="text-xs text-[#a8bfd0] glass-panel px-3 py-1.5 border border-white/10">                                                                                                      react-hooks/refs
+
+D:\game-interaktif\client\src\app\dashboard\live\page.tsx
+  44:6  warning  React Hook useEffect has a missing dependency: 'router'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+D:\game-interaktif\client\src\app\dashboard\page.tsx
+    8:42   warning  'SAMPLE_QUIZ' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+   43:19   error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-explicit-any
+   52:5    error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\game-interaktif\client\src\app\dashboard\page.tsx:52:5
+  50 |     if (!u) { router.push("/login"); return; }
+  51 |     if (u.role !== "GURU") { router.push("/login"); return; }
+> 52 |     setUser_(u);
+     |     ^^^^^^^^ Avoid calling setState() directly within an effect
+  53 |     
+  54 |     refresh();
+  55 |  react-hooks/set-state-in-effect
+   90:19   error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-explicit-any
+  145:17   error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-explicit-any
+  289:37   error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-explicit-any
+  350:106  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-explicit-any
+
+D:\game-interaktif\client\src\app\profile\page.tsx
+   6:10  warning  'getUser' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+  33:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\game-interaktif\client\src\app\profile\page.tsx:33:5
+  31 |       }
+  32 |     });
+> 33 |     setProgress(getProgress());
+     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  34 |   }, [router]);
+  35 |
+  36 |   if (!user || !progress) return null;  react-hooks/set-state-in-effect
+
+D:\game-interaktif\client\src\app\tournaments\page.tsx
+   60:19  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   67:21  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\game-interaktif\client\src\app\tournaments\page.tsx:67:21
+  65 |   }, []);
+  66 |
+> 67 |   useEffect(() => { loadTournaments(); }, [loadTournaments]);
+     |                     ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  68 |
+  69 |   const handleJoin = async (tournament: Tournament) => {
+  70 |     if (!user) { setError("Login terlebih dahulu."); return; }  react-hooks/set-state-in-effect
+   88:19  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  114:19  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+
+D:\game-interaktif\client\src\components\AchievementPopup.tsx
+  4:21  warning  'useState' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\game-interaktif\client\src\components\NavBar.tsx
+  21:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\game-interaktif\client\src\components\NavBar.tsx:21:5
+  19 |
+  20 |   useEffect(() => {
+> 21 |     setUser_(getUser());
+     |     ^^^^^^^^ Avoid calling setState() directly within an effect
+  22 |     const p = getProgress();
+  23 |     setXp(p.xp); setLevel(p.level);
+  24 |   }, [pathname]);  react-hooks/set-state-in-effect
+
+D:\game-interaktif\client\src\lib\quizStore.ts
+  21:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+✖ 22 problems (17 errors, 5 warnings)

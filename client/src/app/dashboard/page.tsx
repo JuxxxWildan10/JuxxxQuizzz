@@ -138,17 +138,22 @@ export default function DashboardPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal membuat kuis");
       
-      setEditing(prev => {
-        const base = prev || blankQuiz();
-        return {
-          ...base,
-          id: data.id || base.id, // Replace with DB ID if provided
-          title: data.title || `Kuis AI: ${aiTopic}`,
-          questions: data.questions
-        };
-      });
-      // Optionally trigger refresh so the list shows the newly saved quiz
-      refresh();
+      if (data.id) {
+        // Quiz already saved to DB by server — just refresh the list and close
+        await refresh();
+        setEditing(null);
+        setError("");
+      } else {
+        // Fallback (no API key): server returned preview-only data, open editor for user to save manually
+        setEditing(prev => {
+          const base = prev || blankQuiz();
+          return {
+            ...base,
+            title: data.title || `Kuis AI: ${aiTopic}`,
+            questions: data.questions
+          };
+        });
+      }
       setAiTopic(""); // Reset topic field
     } catch (e: unknown) {
       setError((e as Error).message || "Gagal memproses pembuatan kuis AI.");

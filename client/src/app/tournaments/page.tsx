@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getUser } from "@/lib/auth";
+import { getUser, getToken, type User } from "@/lib/auth";
 
 const SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:4000";
 
@@ -37,7 +37,7 @@ function formatDate(d: string) {
 }
 
 export default function TournamentsPage() {
-  const user = typeof window !== "undefined" ? getUser() : null;
+  const [user,           setUser_]          = useState<User | null>(null);
   const [tournaments,    setTournaments]    = useState<Tournament[]>([]);
   const [loading,        setLoading]        = useState(true);
   const [error,          setError]          = useState("");
@@ -64,7 +64,10 @@ export default function TournamentsPage() {
     }
   }, []);
 
-  useEffect(() => { setTimeout(() => loadTournaments(), 0); }, [loadTournaments]);
+  useEffect(() => {
+    setUser_(getUser());
+    setTimeout(() => loadTournaments(), 0);
+  }, [loadTournaments]);
 
   const handleJoin = async (tournament: Tournament) => {
     if (!user) { setError("Login terlebih dahulu."); return; }
@@ -75,7 +78,7 @@ export default function TournamentsPage() {
     }
     setJoining(tournament.id);
     try {
-      const token = localStorage.getItem("authToken") || "";
+      const token = getToken() || "";
       const res = await fetch(`${SERVER_URL}/api/tournaments/${tournament.id}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -99,7 +102,7 @@ export default function TournamentsPage() {
     }
     setCreating(true);
     try {
-      const token = localStorage.getItem("authToken") || "";
+      const token = getToken() || "";
       const res = await fetch(`${SERVER_URL}/api/tournaments`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

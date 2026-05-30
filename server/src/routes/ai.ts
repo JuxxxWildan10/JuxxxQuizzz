@@ -177,11 +177,25 @@ Harap pastikan output HANYA berupa JSON valid sesuai dengan struktur di atas.`;
         console.log(`[AI Route] Successfully generated ${formattedQuestions.length} questions using ${modelName}`);
 
         try {
+          // Generate unique roomCode for this AI quiz
+          function genAiCode(): string {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+          }
+          let aiRoomCode = genAiCode();
+          // Ensure uniqueness (retry up to 5x)
+          for (let attempt = 0; attempt < 5; attempt++) {
+            const existing = await prisma.quiz.findUnique({ where: { roomCode: aiRoomCode } });
+            if (!existing) break;
+            aiRoomCode = genAiCode();
+          }
+
           // Save to database directly
           const savedQuiz = await prisma.quiz.create({
             data: {
               title: parsedData.title || `Kuis AI: ${topic}`,
               creatorId: req.user!.id,
+              roomCode: aiRoomCode,
               questions: {
                 create: formattedQuestions.map((q: any) => ({
                   text: q.text,

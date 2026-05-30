@@ -109,7 +109,9 @@ function BattleInner() {
     socket.on("player_attack", (d: AttackPayload) => {
       if (d.damage > 0) {
         const id = ++popupId.current;
-        setPopups(p => [...p, { id, value: d.damage, correct: d.isCorrect }]);
+        const vfxX = 30 + Math.random() * 40; // Randomize slash position on boss
+        const vfxY = 20 + Math.random() * 50;
+        setPopups(p => [...p, { id, value: d.damage, correct: d.isCorrect, x: vfxX, y: vfxY }]);
         setBossShake(true);
         setTimeout(() => setBossShake(false), 400);
         setTimeout(() => setPopups(p => p.filter(x => x.id !== id)), 1200);
@@ -132,7 +134,7 @@ function BattleInner() {
     });
 
     socket.on("float_emote", ({ emote }: { emote: string }) => {
-      const id = Math.random();
+      const id = ++popupId.current; // reuse atomic counter — guaranteed unique
       const x = 10 + Math.random() * 80;
       const rot = Math.random() * 60 - 30;
       setFloatingEmotes(p => [...p, { id, emote, x, rot }]);
@@ -456,9 +458,12 @@ function BattleInner() {
       </div>
 
       <div className="min-h-[calc(100vh-64px)] p-4 flex flex-col items-center max-w-5xl mx-auto relative">
-        {/* BG grid */}
-        <div className="fixed inset-0 pointer-events-none"
-          style={{ backgroundImage:"linear-gradient(rgba(0,212,255,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.015) 1px,transparent 1px)", backgroundSize:"60px 60px" }} />
+        {/* Scrolling Parallax BG */}
+        <motion.div className="fixed inset-0 pointer-events-none opacity-20"
+          animate={{ backgroundPosition: ["0px 0px", "0px 100vh"] }}
+          transition={{ repeat: Infinity, duration: 20, ease: "linear" }}
+          style={{ backgroundImage:"linear-gradient(rgba(0,212,255,0.1) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.1) 1px,transparent 1px)", backgroundSize:"80px 80px" }} />
+        <div className="fixed inset-0 pointer-events-none bg-gradient-to-b from-[#050508] via-transparent to-[#050508]" />
 
         {/* Top bar */}
         <div className="w-full flex justify-between items-center mt-2 mb-3 relative z-10">
@@ -531,33 +536,48 @@ function BattleInner() {
         )}
 
         {/* Boss Visual area */}
-        <div className="relative flex items-center justify-center my-6 relative z-10">
+        <div className="relative flex items-center justify-center my-8 relative z-10 w-full max-w-md h-64">
           <AnimatePresence>
             {popups.map(p => (
-              <motion.div key={p.id} initial={{ opacity:1, y:0, scale:1 }} animate={{ opacity:0, y:-80, scale:1.4 }}
-                exit={{ opacity:0 }} transition={{ duration:1 }}
-                className={`absolute font-bold font-['Orbitron'] text-2xl pointer-events-none z-20 ${p.correct?"text-[#f5e642]":"text-[#546e7a]"}`}
-                style={{ textShadow: p.correct?"0 0 12px rgba(245,230,66,0.6)":"none" }}>
-                {p.correct ? `-${p.value.toLocaleString()}` : "MISS!"}
-              </motion.div>
+              <div key={p.id} className="absolute inset-0 pointer-events-none z-30">
+                {/* Hit Text */}
+                <motion.div initial={{ opacity:1, y:0, scale:1 }} animate={{ opacity:0, y:-80, scale:1.5 }}
+                  exit={{ opacity:0 }} transition={{ duration:1, ease:"easeOut" }}
+                  className={`absolute font-bold font-['Orbitron'] text-3xl ${p.correct?"text-[#f5e642]":"text-[#546e7a]"}`}
+                  style={{ left: `${(p as any).x}%`, top: `${(p as any).y}%`, textShadow: p.correct?"0 0 15px rgba(245,230,66,0.8)":"none" }}>
+                  {p.correct ? `-${p.value.toLocaleString()}` : "MISS!"}
+                </motion.div>
+                {/* VFX Slash */}
+                {p.correct && (
+                  <div className="absolute w-32 h-2 bg-gradient-to-r from-transparent via-[#00d4ff] to-transparent animate-slash"
+                       style={{ left: `calc(${(p as any).x}% - 4rem)`, top: `calc(${(p as any).y}% + 1rem)` }} />
+                )}
+              </div>
             ))}
           </AnimatePresence>
+
           <motion.div
             animate={
-              roomData.status === "FINISHED" ? { opacity:0, scale:0 }
-              : bossShake ? { x:[-10,10,-10,10,0] }
-              : { y:[0,-8,0] }
+              roomData.status === "FINISHED" ? { opacity:0, scale:0, filter:"brightness(0) blur(10px)" }
+              : bossShake ? { x:[-15,15,-10,10,0], filter:"brightness(1.5)" }
+              : hp < 30 ? { y:[0,-10,0], scale:[1, 1.05, 1], filter:"hue-rotate(320deg) drop-shadow(0 0 30px #ff2a6d)" } // Enraged state
+              : { y:[0,-15,0], scale:[1, 1.02, 1] } // Idle breathing
             }
             transition={
-              roomData.status === "FINISHED" ? { duration:0.6 }
-              : bossShake ? { duration:0.35 }
-              : { repeat:Infinity, duration:2.5, ease:"easeInOut" }
+              roomData.status === "FINISHED" ? { duration:0.8 }
+              : bossShake ? { duration:0.3 }
+              : hp < 30 ? { repeat:Infinity, duration:1.5, ease:"easeInOut" }
+              : { repeat:Infinity, duration:3, ease:"easeInOut" }
             }
-            className="w-40 h-40 rounded-full border-4 border-[#ff2a6d] flex items-center justify-center bg-black/60 shadow-[0_0_40px_rgba(255,42,109,0.35)] relative"
+            className="relative flex items-center justify-center w-full h-full"
           >
-            <span className="text-7xl">🐉</span>
+            {/* The actual Dragon Asset */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/dragon-boss.png" alt="Dragon Boss" className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(0,212,255,0.4)]" />
+            
+            {/* Hit indicator ring */}
             {bossShake && (
-              <div className="absolute inset-0 rounded-full border-4 border-[#ff2a6d]/80 animate-ping" />
+              <div className="absolute inset-0 rounded-full border-4 border-[#ff2a6d] animate-ping opacity-50" />
             )}
           </motion.div>
         </div>
@@ -616,28 +636,28 @@ function BattleInner() {
                     const isDimmed = (answered || timeLeft===0) && !isCorrect && ans.id !== selectedId;
                     return (
                       <motion.button key={ans.id}
-                        whileHover={answered ? {} : { scale:1.03, y:-2 }}
+                        whileHover={answered ? {} : { scale:1.02, filter: "brightness(1.2)" }}
                         whileTap={answered ? {} : { scale:0.97 }}
                         onClick={() => submitAnswer(ans.id)}
                         disabled={answered || timeLeft===0}
-                        className={`p-4 rounded-xl border-2 text-left text-sm font-medium transition-all disabled:cursor-not-allowed relative overflow-hidden ${
-                          isCorrect ? "border-green-400 bg-green-500/15 text-green-300"
-                          : isWrong ? "border-[#ff2a6d] bg-[#ff2a6d]/15 text-[#ff2a6d]"
+                        className={`p-4 rounded-xl border-2 text-left text-sm font-medium transition-all disabled:cursor-not-allowed relative overflow-hidden backdrop-blur-md ${
+                          isCorrect ? "border-green-400 bg-green-500/20 text-green-300"
+                          : isWrong ? "border-[#ff2a6d] bg-[#ff2a6d]/20 text-[#ff2a6d]"
                           : isDimmed ? "border-white/5 bg-white/3 opacity-30 text-white"
-                          : "border-white/10 bg-black/30 text-white hover:border-white/30 hover:bg-white/5"
+                          : "border-[#00d4ff]/30 bg-[#0d1a2e]/60 text-white hover:border-[#00d4ff] hover:bg-[#00d4ff]/10 hover:shadow-[0_0_20px_rgba(0,212,255,0.3)]"
                         }`}
-                        style={isCorrect ? { boxShadow:"0 0 15px rgba(74,222,128,0.3)" } : isWrong ? { boxShadow:"0 0 15px rgba(255,42,109,0.2)" } : undefined}>
-                        {/* Shine effect on hover */}
-                        {!answered && <motion.div className="absolute inset-0 bg-white/5 -skew-x-12" initial={{ x:"-100%" }} whileHover={{ x:"200%" }} transition={{ duration:0.4 }} />}
-                        <div className="flex items-start gap-3">
-                          <span className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold font-['Orbitron']"
-                            style={{ background:isDimmed ? "rgba(255,255,255,0.05)" : `${colors[i]}20`, color:isDimmed ? "#546e7a" : colors[i], border:`1px solid ${isDimmed ? 'rgba(255,255,255,0.05)' : colors[i]+'40'}` }}>
+                        style={isCorrect ? { boxShadow:"0 0 20px rgba(74,222,128,0.4)" } : isWrong ? { boxShadow:"0 0 20px rgba(255,42,109,0.4)" } : undefined}>
+                        {/* Shimmer effect inside button */}
+                        {!answered && <motion.div className="absolute inset-0 w-[200%] bg-gradient-to-r from-transparent via-white/5 to-transparent -skew-x-12" initial={{ x:"-100%" }} animate={{ x:"100%" }} transition={{ repeat:Infinity, duration:2, ease:"linear" }} />}
+                        <div className="flex items-start gap-3 relative z-10">
+                          <span className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold font-['Orbitron'] border"
+                            style={{ background:isDimmed ? "rgba(255,255,255,0.05)" : `${colors[i]}20`, color:isDimmed ? "#546e7a" : colors[i], borderColor:isDimmed ? 'rgba(255,255,255,0.05)' : colors[i] }}>
                             {labels[i]}
                           </span>
-                          <span className="pt-0.5 leading-snug">{ans.text}</span>
+                          <span className="pt-1 leading-snug tracking-wide">{ans.text}</span>
                         </div>
-                        {isCorrect && <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="absolute top-2 right-2 text-green-400 text-lg">✓</motion.div>}
-                        {isWrong && <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} className="absolute top-2 right-2 text-[#ff2a6d] text-lg">×</motion.div>}
+                        {isCorrect && <motion.div initial={{ opacity:0, scale:2 }} animate={{ opacity:1, scale:1 }} className="absolute top-1/2 -translate-y-1/2 right-4 text-green-400 text-2xl drop-shadow-[0_0_8px_rgba(74,222,128,0.8)]">✓</motion.div>}
+                        {isWrong && <motion.div initial={{ opacity:0, scale:2 }} animate={{ opacity:1, scale:1 }} className="absolute top-1/2 -translate-y-1/2 right-4 text-[#ff2a6d] text-2xl drop-shadow-[0_0_8px_rgba(255,42,109,0.8)]">×</motion.div>}
                       </motion.button>
                     );
                   })}

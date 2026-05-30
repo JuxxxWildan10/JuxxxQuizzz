@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getQuizzes, type Quiz } from "@/lib/quizStore";
+import { getQuizzes, SAMPLE_QUIZ, type Quiz } from "@/lib/quizStore";
+import { getUser } from "@/lib/auth";
 import { sound } from "@/lib/sound";
 import { addXP, unlockAchievement, ACHIEVEMENTS } from "@/lib/xp";
 import AchievementPopup from "@/components/AchievementPopup";
@@ -26,16 +27,18 @@ export default function PracticePage() {
 
   useEffect(() => {
     async function loadData() {
+      const user = getUser();
+      // Only teachers have quizzes in DB; students get SAMPLE_QUIZ as fallback
+      if (user?.role !== 'GURU') {
+        setQuizzes([SAMPLE_QUIZ]);
+        return;
+      }
       try {
         const qs = await getQuizzes();
-        // If there are no custom quizzes, populate with sample quiz
-        if (qs.length === 0) {
-          setQuizzes([]);
-        } else {
-          setQuizzes(qs);
-        }
+        setQuizzes(qs.length > 0 ? qs : [SAMPLE_QUIZ]);
       } catch (err) {
         console.error("Gagal memuat kuis latihan:", err);
+        setQuizzes([SAMPLE_QUIZ]); // fallback gracefully
       }
     }
     loadData();
@@ -265,7 +268,7 @@ export default function PracticePage() {
       {answered && (
         <motion.p initial={{ opacity:0, y:5 }} animate={{ opacity:1, y:0 }}
           className={`text-center mt-4 text-sm font-bold ${selectedId === correct?.id ? "text-green-400" : "text-[#ff2a6d]"}`}>
-          {selectedId === correct?.id ? `✅ Benar! +${100*(combo)} pts` : `❌ Salah! Jawaban: ${correct?.text}`}
+          {selectedId === correct?.id ? `✅ Benar! +${100 * combo + Math.max(0, ((q.timeLimit ?? 30) - ((q.timeLimit ?? QUESTION_TIME) - timeLeft)) * 5)} pts` : `❌ Salah! Jawaban: ${correct?.text}`}
         </motion.p>
       )}
 

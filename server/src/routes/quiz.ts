@@ -55,7 +55,13 @@ router.get('/', requireTeacher, async (req: AuthRequest, res: Response): Promise
     let updated = false;
     for (const quiz of quizzes) {
       if (!quiz.roomCode) {
-        quiz.roomCode = genCode();
+        let newCode = genCode();
+        for (let i = 0; i < 5; i++) {
+          const existing = await prisma.quiz.findUnique({ where: { roomCode: newCode } });
+          if (!existing) break;
+          newCode = genCode();
+        }
+        quiz.roomCode = newCode;
         await prisma.quiz.update({ where: { id: quiz.id }, data: { roomCode: quiz.roomCode } });
         updated = true;
       }
@@ -75,11 +81,18 @@ router.post('/', requireTeacher, async (req: AuthRequest, res: Response): Promis
   }
 
   try {
+    let roomCode = genCode();
+    for (let i = 0; i < 5; i++) {
+      const existing = await prisma.quiz.findUnique({ where: { roomCode } });
+      if (!existing) break;
+      roomCode = genCode();
+    }
+
     const quiz = await prisma.quiz.create({
       data: {
         title: title.trim(),
         mode: mode || 'BOSS_BATTLE',
-        roomCode: genCode(),
+        roomCode,
         creatorId: req.user!.id,
         questions: {
           create: questions.map(q => ({

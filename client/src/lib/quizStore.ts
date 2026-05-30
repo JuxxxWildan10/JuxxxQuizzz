@@ -31,7 +31,7 @@ export async function saveQuiz(quiz: Quiz): Promise<Quiz> {
   const isSample = quiz.id.startsWith('sample-');
 
   if (!isSample) {
-    // Try to update existing quiz
+    // Try to update existing quiz — only fallback to create on 404 (quiz not found)
     try {
       const res = await fetch(`${SOCKET_URL}/api/quizzes/${quiz.id}`, {
         method: 'PUT',
@@ -44,8 +44,20 @@ export async function saveQuiz(quiz: Quiz): Promise<Quiz> {
       if (res.ok) {
         return await res.json();
       }
-    } catch (e) {
-      console.warn('[QuizStore] Update failed, attempting create.', e);
+      // If it's an auth/forbidden error — throw immediately, don't silently create a duplicate
+      if (res.status !== 404) {
+        const data = await res.json();
+        throw new Error(data.error || `Update gagal (${res.status}).`);
+      }
+      // 404: quiz not in DB yet (e.g. generated from AI with temp id), fall through to create
+    } catch (e: unknown) {
+      // Re-throw auth/forbidden errors; only swallow network errors
+      if ((e as Error).message?.toLowerCase().includes('update gagal') ||
+          (e as Error).message?.toLowerCase().includes('ditolak') ||
+          (e as Error).message?.toLowerCase().includes('token')) {
+        throw e;
+      }
+      console.warn('[QuizStore] Update failed with network error, attempting create.', e);
     }
   }
 

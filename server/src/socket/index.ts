@@ -118,10 +118,11 @@ async function persistGameResults(code: string, results: any[], bossDefeated: bo
     // Jalankan semua upsert user secara bersamaan
     const savedUsers = await prisma.$transaction(upsertUserQueries);
 
-    // 3. Update Level/Rank & Prepare Sessions + Analytics
+    // Build a Map for safe lookup by name (order from $transaction not guaranteed)
+    const userByName = new Map<string, typeof savedUsers[0]>();
+    savedUsers.forEach(u => userByName.set(u.name, u));
     const rankUpdates: any[] = [];
     const sessionCreates: any[] = [];
-    const achievementsCreates: any[] = [];
 
     const ranks = [
       { name: 'BRONZE', minXP: 0 },
@@ -131,8 +132,9 @@ async function persistGameResults(code: string, results: any[], bossDefeated: bo
       { name: 'MYTHIC', minXP: 50000 },
     ];
 
-    savedUsers.forEach((user, index) => {
-      const player = results[index]; // Same order
+    results.forEach((player) => {
+      const user = userByName.get(player.name);
+      if (!user) return; // safety: user not found in saved batch
       const newLevel = Math.max(1, Math.floor(Math.sqrt(user.xp / 50)));
       const newRank = [...ranks].reverse().find(r => user.xp >= r.minXP)?.name ?? 'BRONZE';
 

@@ -26,6 +26,7 @@ const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000'
 export default function LeaderboardPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardPlayer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("ALL TIME");
 
   useEffect(() => {
     async function loadData() {
@@ -64,10 +65,10 @@ export default function LeaderboardPage() {
 
         {/* Period tabs */}
         <div className="flex justify-center gap-2 mb-8">
-          {["ALL TIME","BULANAN","MINGGUAN"].map((p,i) => (
-            <button key={p}
+          {["ALL TIME","BULANAN","MINGGUAN"].map((p) => (
+            <button key={p} onClick={() => setActiveTab(p)}
               className={`px-4 py-2 rounded text-xs font-bold font-['Orbitron'] tracking-wider transition border
-                ${i===0
+                ${activeTab === p
                   ? "bg-[#00d4ff] text-[#050508] border-[#00d4ff] neon-border-cyan"
                   : "bg-transparent text-[#546e7a] border-[#00d4ff]/20 hover:border-[#00d4ff]/50 hover:text-[#00d4ff]"}`}>
               {p}
@@ -75,7 +76,15 @@ export default function LeaderboardPage() {
           ))}
         </div>
 
-        {loading ? (
+        {activeTab !== "ALL TIME" ? (
+          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="glass-panel text-center py-16 border border-white/10">
+            <div className="text-5xl mb-3">⏳</div>
+            <h3 className="text-white font-bold font-['Orbitron'] mb-2">Mengumpulkan Data...</h3>
+            <p className="text-[#546e7a] text-sm max-w-sm mx-auto">
+              Belum cukup data historis untuk menampilkan peringkat {activeTab.toLowerCase()}. Terus mainkan *battle* untuk mencatat sejarah barumu!
+            </p>
+          </motion.div>
+        ) : loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <motion.div animate={{ rotate:360 }} transition={{ repeat:Infinity, duration:1, ease:"linear" }}
               className="w-12 h-12 border-4 border-[#00d4ff] border-t-transparent rounded-full" />

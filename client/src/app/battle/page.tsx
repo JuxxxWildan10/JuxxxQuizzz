@@ -573,7 +573,7 @@ function BattleInner() {
           >
             {/* The actual Dragon Asset */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/dragon-boss.png" alt="Dragon Boss" className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(0,212,255,0.4)]" />
+            <img src="/dragon-boss2.png" alt="Dragon Boss" className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(0,212,255,0.4)]" style={{ mixBlendMode: 'screen' }} />
             
             {/* Hit indicator ring */}
             {bossShake && (

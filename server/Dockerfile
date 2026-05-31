@@ -1,21 +1,27 @@
+# Menggunakan image Node.js yang ringan
 FROM node:20-alpine
 
+# Set direktori kerja di dalam container
 WORKDIR /app
 
-# Install dependencies
+# Menyalin package.json dan package-lock.json (jika ada)
 COPY package*.json ./
-RUN npm ci --only=production
 
-# Copy prisma schema and generate client
-COPY prisma ./prisma/
+# Menginstal dependensi
+RUN npm install
+
+# Menyalin seluruh folder server ke dalam container
+COPY . .
+
+# Menjalankan Prisma Generate (Sangat Penting untuk Supabase/Postgres)
 RUN npx prisma generate
 
-# Copy source and build
-COPY tsconfig.json ./
-COPY src ./src
+# Mengompilasi TypeScript ke JavaScript (folder dist)
 RUN npm run build
 
-EXPOSE 4000
-ENV NODE_ENV=production
+# Menentukan port yang akan digunakan Cloud Run (standar 8080)
+ENV PORT=8080
+EXPOSE 8080
 
-CMD ["node", "dist/index.js"]
+# Menjalankan server
+CMD ["npm", "start"]

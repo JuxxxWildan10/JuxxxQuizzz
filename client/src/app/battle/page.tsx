@@ -458,12 +458,10 @@ function BattleInner() {
       </div>
 
       <div className="min-h-[calc(100vh-64px)] p-4 flex flex-col items-center max-w-5xl mx-auto relative">
-        {/* Scrolling Parallax BG */}
-        <motion.div className="fixed inset-0 pointer-events-none opacity-20"
-          animate={{ backgroundPosition: ["0px 0px", "0px 100vh"] }}
-          transition={{ repeat: Infinity, duration: 20, ease: "linear" }}
+        {/* Static Grid BG (Optimized for Mobile) */}
+        <div className="fixed inset-0 pointer-events-none opacity-20"
           style={{ backgroundImage:"linear-gradient(rgba(0,212,255,0.1) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.1) 1px,transparent 1px)", backgroundSize:"80px 80px" }} />
-        <div className="fixed inset-0 pointer-events-none bg-gradient-to-b from-[#050508] via-transparent to-[#050508]" />
+        <div className="fixed inset-0 pointer-events-none bg-gradient-to-b from-[#050508] via-[#050508]/80 to-[#050508]" />
 
         {/* Top bar */}
         <div className="w-full flex flex-wrap justify-between items-center gap-2 mt-2 mb-3 relative z-10">
@@ -558,15 +556,15 @@ function BattleInner() {
 
           <motion.div
             animate={
-              roomData.status === "FINISHED" ? { opacity:0, scale:0, filter:"brightness(0) blur(10px)" }
-              : bossShake ? { x:[-15,15,-10,10,0], filter:"brightness(1.5)" }
-              : hp < 30 ? { y:[0,-10,0], scale:[1, 1.05, 1], filter:"hue-rotate(320deg) drop-shadow(0 0 30px #ff2a6d)" } // Enraged state
-              : { y:[0,-15,0], scale:[1, 1.02, 1] } // Idle breathing
+              roomData.status === "FINISHED" ? { opacity:0, scale:0 }
+              : bossShake ? { x:[-10,10,-10,10,0] }
+              : hp < 30 ? { y:[0,-10,0], scale:[1, 1.05, 1] } // Enraged state
+              : { y:[0,-10,0], scale:[1, 1.02, 1] } // Idle breathing
             }
             transition={
               roomData.status === "FINISHED" ? { duration:0.8 }
               : bossShake ? { duration:0.3 }
-              : hp < 30 ? { repeat:Infinity, duration:1.5, ease:"easeInOut" }
+              : hp < 30 ? { repeat:Infinity, duration:1.2, ease:"easeInOut" }
               : { repeat:Infinity, duration:3, ease:"easeInOut" }
             }
             className="relative flex items-center justify-center w-full h-full"
@@ -640,13 +638,13 @@ function BattleInner() {
                         whileTap={answered ? {} : { scale:0.97 }}
                         onClick={() => submitAnswer(ans.id)}
                         disabled={answered || timeLeft===0}
-                        className={`p-4 rounded-xl border-2 text-left text-sm font-medium transition-all disabled:cursor-not-allowed relative overflow-hidden backdrop-blur-md ${
-                          isCorrect ? "border-green-400 bg-green-500/20 text-green-300"
-                          : isWrong ? "border-[#ff2a6d] bg-[#ff2a6d]/20 text-[#ff2a6d]"
-                          : isDimmed ? "border-white/5 bg-white/3 opacity-30 text-white"
-                          : "border-[#00d4ff]/30 bg-[#0d1a2e]/60 text-white hover:border-[#00d4ff] hover:bg-[#00d4ff]/10 hover:shadow-[0_0_20px_rgba(0,212,255,0.3)]"
+                        className={`p-4 rounded-xl border-2 text-left text-sm font-medium transition-all disabled:cursor-not-allowed relative overflow-hidden ${
+                          isCorrect ? "border-green-400 bg-green-900/40 text-green-300"
+                          : isWrong ? "border-[#ff2a6d] bg-red-900/40 text-[#ff2a6d]"
+                          : isDimmed ? "border-white/5 bg-white/5 opacity-30 text-white"
+                          : "border-[#00d4ff]/30 bg-[#0d1a2e]/90 text-white hover:border-[#00d4ff]"
                         }`}
-                        style={isCorrect ? { boxShadow:"0 0 20px rgba(74,222,128,0.4)" } : isWrong ? { boxShadow:"0 0 20px rgba(255,42,109,0.4)" } : undefined}>
+                        style={isCorrect ? { boxShadow:"0 0 10px rgba(74,222,128,0.2)" } : isWrong ? { boxShadow:"0 0 10px rgba(255,42,109,0.2)" } : undefined}>
                         {/* Shimmer effect inside button */}
                         {!answered && <motion.div className="absolute inset-0 w-[200%] bg-gradient-to-r from-transparent via-white/5 to-transparent -skew-x-12" initial={{ x:"-100%" }} animate={{ x:"100%" }} transition={{ repeat:Infinity, duration:2, ease:"linear" }} />}
                         <div className="flex items-start gap-3 relative z-10">

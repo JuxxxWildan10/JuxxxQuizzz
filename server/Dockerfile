@@ -1,6 +1,9 @@
 # Menggunakan image Node.js yang ringan
 FROM node:20-alpine
 
+# Menginstal OpenSSL (Wajib untuk Prisma di Alpine)
+RUN apk add --no-cache openssl
+
 # Set direktori kerja di dalam container
 WORKDIR /app
 

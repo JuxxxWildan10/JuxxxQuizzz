@@ -282,7 +282,7 @@ function BattleInner() {
           {/* Mode selector */}
           <div>
             <label className="text-[10px] font-bold text-[#00d4ff] uppercase tracking-[0.2em] mb-2 block">⚔️ Mode Pertempuran</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {[
                 { id:'BOSS_BATTLE',   name:'Boss Battle',   icon:'🐉', desc:'Kalahkan bos', color:'#ff2a6d' },
                 { id:'BATTLE_ROYALE', name:'Battle Royale', icon:'👑', desc:'Terakhir berdiri', color:'#f5e642' },
@@ -466,7 +466,7 @@ function BattleInner() {
         <div className="fixed inset-0 pointer-events-none bg-gradient-to-b from-[#050508] via-transparent to-[#050508]" />
 
         {/* Top bar */}
-        <div className="w-full flex justify-between items-center mt-2 mb-3 relative z-10">
+        <div className="w-full flex flex-wrap justify-between items-center gap-2 mt-2 mb-3 relative z-10">
           <div className="glass-panel px-3 py-1.5 text-xs font-bold font-['Orbitron'] text-[#00d4ff] border border-[#00d4ff]/20">
             ROOM: {activeCode}
           </div>
@@ -536,7 +536,7 @@ function BattleInner() {
         )}
 
         {/* Boss Visual area */}
-        <div className="relative flex items-center justify-center my-8 relative z-10 w-full max-w-md h-64">
+        <div className="relative flex items-center justify-center my-4 md:my-8 relative z-10 w-full max-w-md h-48 md:h-64">
           <AnimatePresence>
             {popups.map(p => (
               <div key={p.id} className="absolute inset-0 pointer-events-none z-30">
@@ -627,7 +627,7 @@ function BattleInner() {
                   </span>
                 </div>
                 <h3 className="text-base text-white font-bold mb-4 leading-snug">{question.text}</h3>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {question.answers.map((ans, i) => {
                     const labels = ["A","B","C","D"];
                     const colors = ["#00d4ff","#f5e642","#ff2a6d","#a855f7"];
@@ -670,8 +670,8 @@ function BattleInner() {
                 )}
 
                 {/* 💥 Dynamic quick reaction emote panel */}
-                <div className="flex items-center gap-1.5 justify-center mt-6 bg-black/45 p-2 rounded-xl border border-white/5">
-                  <span className="text-[10px] text-[#546e7a] font-bold font-['Orbitron'] mr-1 uppercase">Reaksi:</span>
+                <div className="flex flex-wrap items-center gap-1.5 justify-center mt-6 bg-black/45 p-2 rounded-xl border border-white/5">
+                  <span className="text-[10px] text-[#546e7a] font-bold font-['Orbitron'] mr-1 uppercase w-full text-center sm:w-auto sm:text-left mb-1 sm:mb-0">Reaksi:</span>
                   {["🔥", "👑", "💀", "💥", "🐉", "👍", "👎"].map(em => (
                     <motion.button key={em} whileHover={{ scale: 1.25 }} whileTap={{ scale: 0.85 }}
                       onClick={() => sendEmote(em)}

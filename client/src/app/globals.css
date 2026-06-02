@@ -104,98 +104,64 @@
 
 body {
   background-color: #050508;
-  background-image:
-    radial-gradient(ellipse 80% 60% at 50% -20%, rgba(0, 80, 160, 0.25) 0%, transparent 70%),
-    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(0, 50, 120, 0.15) 0%, transparent 60%);
+  /* Simplified for performance: removed radial gradients */
   overflow-x: hidden;
 }
 
-/* ── Cyberpunk Glassmorphism ── */
+/* ── Performance Optimized Panels ── */
 .glass-panel {
-  background: rgba(0, 8, 30, 0.65);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(0, 10, 35, 0.95); /* More opaque, no blur for performance */
   border: 1px solid rgba(0, 212, 255, 0.18);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 rgba(0, 212, 255, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
   border-radius: 12px;
 }
 
 .glass-panel-yellow {
-  background: rgba(10, 8, 0, 0.7);
-  backdrop-filter: blur(16px);
+  background: rgba(15, 12, 0, 0.95); /* More opaque, no blur for performance */
   border: 1px solid rgba(245, 230, 66, 0.25);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(245, 230, 66, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
   border-radius: 12px;
 }
 
-/* ── Neon Text (Cyberpunk Blue) ── */
+/* ── Neon Text (Simplified for Performance) ── */
 .neon-text-cyan {
   color: #00d4ff;
-  text-shadow:
-    0 0 4px  #00d4ff,
-    0 0 12px #00d4ff,
-    0 0 30px #0080ff,
-    0 0 60px rgba(0, 128, 255, 0.4);
+  text-shadow: 0 0 8px #00d4ff;
 }
 
 /* ── Neon Text (Cyberpunk Yellow) ── */
 .neon-text-pink {
   color: #f5e642;
-  text-shadow:
-    0 0 4px  #f5e642,
-    0 0 12px #f5e642,
-    0 0 30px rgba(245, 230, 66, 0.6);
+  text-shadow: 0 0 8px #f5e642;
 }
 
 .neon-text-yellow {
   color: #f5e642;
-  text-shadow: 0 0 4px #f5e642, 0 0 12px #f5e642;
+  text-shadow: 0 0 8px #f5e642;
 }
 
 .neon-text-red {
   color: #ff2a6d;
-  text-shadow: 0 0 4px #ff2a6d, 0 0 15px #ff2a6d;
+  text-shadow: 0 0 8px #ff2a6d;
 }
 
-/* ── Neon Borders ── */
+/* ── Neon Borders (Simplified) ── */
 .neon-border-cyan {
   border: 1.5px solid #00d4ff !important;
-  box-shadow:
-    0 0 8px  rgba(0, 212, 255, 0.6),
-    0 0 20px rgba(0, 212, 255, 0.3),
-    inset 0 0 8px rgba(0, 212, 255, 0.08);
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
 }
 
 .neon-border-pink {
   border: 1.5px solid #f5e642 !important;
-  box-shadow:
-    0 0 8px  rgba(245, 230, 66, 0.6),
-    0 0 20px rgba(245, 230, 66, 0.3),
-    inset 0 0 8px rgba(245, 230, 66, 0.08);
+  box-shadow: 0 0 8px rgba(245, 230, 66, 0.4);
 }
 
 .neon-border-red {
   border: 1.5px solid #ff2a6d !important;
-  box-shadow: 0 0 8px rgba(255, 42, 109, 0.6), 0 0 20px rgba(255, 42, 109, 0.3);
+  box-shadow: 0 0 8px rgba(255, 42, 109, 0.4);
 }
 
-/* ── Cyberpunk scanlines overlay ── */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 212, 255, 0.015) 2px,
-    rgba(0, 212, 255, 0.015) 4px
-  );
-  pointer-events: none;
-  z-index: 9999;
-}
+/* ── Cyberpunk scanlines removed for performance ── */
 
 /* ── Boss HP Bar (stays red for danger feel) ── */
 .boss-hp-bar-container {
@@ -227,14 +193,14 @@ body::before {
 ::-webkit-scrollbar-thumb { background: #00d4ff; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #33e5ff; box-shadow: 0 0 6px #00d4ff; }
 
-/* ── Animations ── */
+/* ── Animations (Simplified) ── */
 @keyframes pulse-neon-blue {
-  0%,100% { box-shadow: 0 0 5px #00d4ff, 0 0 10px #00d4ff; }
-  50%      { box-shadow: 0 0 15px #00d4ff, 0 0 35px #00d4ff, 0 0 60px rgba(0,128,255,0.5); }
+  0%,100% { box-shadow: 0 0 5px rgba(0, 212, 255, 0.5); }
+  50%      { box-shadow: 0 0 15px rgba(0, 212, 255, 0.8); }
 }
 @keyframes pulse-neon-yellow {
-  0%,100% { box-shadow: 0 0 5px #f5e642, 0 0 10px #f5e642; }
-  50%      { box-shadow: 0 0 15px #f5e642, 0 0 35px rgba(245,230,66,0.5); }
+  0%,100% { box-shadow: 0 0 5px rgba(245, 230, 66, 0.5); }
+  50%      { box-shadow: 0 0 15px rgba(245, 230, 66, 0.8); }
 }
 @keyframes shake {
   0%,100% { transform: translateX(0); }

@@ -554,30 +554,78 @@ function BattleInner() {
             ))}
           </AnimatePresence>
 
-          <motion.div
-            animate={
-              roomData.status === "FINISHED" ? { opacity:0, scale:0 }
-              : bossShake ? { x:[-10,10,-10,10,0] }
-              : hp < 30 ? { y:[0,-10,0], scale:[1, 1.05, 1] } // Enraged state
-              : { y:[0,-10,0], scale:[1, 1.02, 1] } // Idle breathing
-            }
-            transition={
-              roomData.status === "FINISHED" ? { duration:0.8 }
-              : bossShake ? { duration:0.3 }
-              : hp < 30 ? { repeat:Infinity, duration:1.2, ease:"easeInOut" }
-              : { repeat:Infinity, duration:3, ease:"easeInOut" }
-            }
-            className="relative flex items-center justify-center w-full h-full"
-          >
-            {/* The actual Dragon Asset */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/dragon-boss2.png" alt="Dragon Boss" className="w-full h-full object-contain drop-shadow-[0_0_30px_rgba(0,212,255,0.4)]" style={{ mixBlendMode: 'screen' }} />
+          {/* Advanced 2.5D Boss Container */}
+          <div className="relative flex items-center justify-center w-full h-full" style={{ perspective: "1000px" }}>
+            {/* Base shadow that pulses and scales */}
+            <motion.div 
+              animate={hp < 30 ? { scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] } : { scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+              transition={{ repeat: Infinity, duration: hp < 30 ? 1.2 : 3, ease: "easeInOut" }}
+              className="absolute -bottom-4 w-48 h-8 bg-black/80 rounded-[100%] blur-md"
+            />
             
-            {/* Hit indicator ring */}
-            {bossShake && (
-              <div className="absolute inset-0 rounded-full border-4 border-[#ff2a6d] animate-ping opacity-50" />
+            {/* Glowing Aura Layers */}
+            <motion.div 
+              animate={hp < 30 ? { rotate: [0, 360], scale: [1, 1.1, 1] } : { rotate: [0, -360], scale: [1, 1.05, 1] }}
+              transition={{ rotate: { repeat: Infinity, duration: hp < 30 ? 8 : 20, ease: "linear" }, scale: { repeat: Infinity, duration: hp < 30 ? 1.2 : 3, ease: "easeInOut" } }}
+              className={`absolute w-full h-full rounded-full blur-[60px] opacity-40 mix-blend-screen pointer-events-none ${hp < 30 ? 'bg-gradient-to-tr from-[#ff2a6d] to-purple-600' : 'bg-gradient-to-tr from-[#00d4ff] to-blue-600'}`}
+            />
+
+            {/* Floating Energy Particles */}
+            {hp < 50 && (
+              <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                {[...Array(5)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    animate={{ 
+                      y: [0, -100], 
+                      x: [0, (i % 2 === 0 ? 20 : -20)],
+                      opacity: [0, 0.8, 0],
+                      scale: [0.5, 1.5, 0.5]
+                    }}
+                    transition={{ repeat: Infinity, duration: 2 + Math.random(), delay: Math.random() * 2, ease: "easeOut" }}
+                    className={`absolute bottom-10 left-[${20 + i*15}%] w-2 h-2 rounded-full ${hp < 30 ? 'bg-[#ff2a6d]' : 'bg-[#00d4ff]'} blur-sm`}
+                  />
+                ))}
+              </div>
             )}
-          </motion.div>
+
+            <motion.div
+              animate={
+                roomData.status === "FINISHED" ? { opacity:0, scale:0, rotateX: 90 }
+                : bossShake ? { x:[-15,15,-15,15,0], filter: "brightness(2) contrast(1.5) hue-rotate(-20deg)" }
+                : hp < 30 ? { 
+                    y:[0,-15,0], 
+                    rotateZ: [-2, 2, -2],
+                    rotateX: [0, 10, 0],
+                    scale:[1, 1.08, 1],
+                    filter: "drop-shadow(0 0 40px rgba(255,42,109,0.8)) brightness(1.2)"
+                  } // Enraged state
+                : { 
+                    y:[0,-12,0], 
+                    rotateZ: [-1, 1, -1],
+                    rotateY: [-5, 5, -5],
+                    scale:[1, 1.03, 1],
+                    filter: "drop-shadow(0 0 25px rgba(0,212,255,0.5)) brightness(1)"
+                  } // Idle breathing
+              }
+              transition={
+                roomData.status === "FINISHED" ? { duration:0.8 }
+                : bossShake ? { duration:0.3 }
+                : hp < 30 ? { repeat:Infinity, duration:1.5, ease:"easeInOut" }
+                : { repeat:Infinity, duration:4, ease:"easeInOut" }
+              }
+              className="relative flex items-center justify-center w-full h-full transform-gpu"
+            >
+              {/* The actual Dragon Asset */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/dragon-boss2.png" alt="Dragon Boss" className="w-full h-full object-contain" style={{ mixBlendMode: 'screen' }} />
+              
+              {/* Hit indicator ring */}
+              {bossShake && (
+                <div className="absolute inset-0 rounded-full border-4 border-white animate-ping opacity-80" />
+              )}
+            </motion.div>
+          </div>
         </div>
 
         {/* Bottom panel */}

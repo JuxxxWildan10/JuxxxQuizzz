@@ -175,27 +175,38 @@ export default function DashboardPage() {
         <motion.div initial={{ opacity:0, y:-20 }} animate={{ opacity:1, y:0 }}
           className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-2xl md:text-4xl font-bold font-['Orbitron'] text-white tracking-wider">
+            <h1 className="text-2xl md:text-4xl font-bold font-['Orbitron'] text-white tracking-wider flex items-center gap-3">
               COMMAND <span className="neon-text-pink">CENTER</span>
             </h1>
             <p className="text-[#546e7a] mt-1 text-sm">
               Selamat datang, <b className="text-[#00d4ff]">{user.name}</b>
+              <button onClick={() => router.push("/billing")} className="ml-3 text-[10px] bg-gradient-to-r from-[#a855f7] to-[#d946ef] text-white px-2 py-0.5 rounded-full font-bold shadow-[0_0_10px_rgba(168,85,247,0.4)]">
+                UPGRADE PRO
+              </button>
             </p>
           </div>
-          <div className="flex gap-3 items-center">
+          <div className="flex gap-2 items-center flex-wrap">
             <div className={`flex items-center gap-2 text-xs px-3 py-2 glass-panel
               ${connected ? "text-[#00d4ff]" : "text-[#f5e642]"}`}>
               <span className={`w-2 h-2 rounded-full ${connected ? "bg-[#00d4ff] animate-pulse" : "bg-[#f5e642]"}`} />
               {connected ? "Server Online" : "Menghubungkan..."}
             </div>
+            
+            <motion.button whileHover={{ scale:1.04 }} whileTap={{ scale:0.96 }}
+              onClick={() => router.push("/dashboard/analytics")}
+              className="bg-[#1a0b2e] border border-[#a855f7]/50 hover:bg-[#a855f7]/20 text-white px-4 py-2 rounded font-bold text-xs
+                transition font-['Orbitron'] tracking-wider shadow-[0_0_10px_rgba(168,85,247,0.2)] flex items-center gap-1.5">
+              <span>📊</span> ANALYTICS <span className="text-[9px] text-[#a855f7]">PRO</span>
+            </motion.button>
+
             <motion.button whileHover={{ scale:1.04 }} whileTap={{ scale:0.96 }}
               onClick={() => setEditing(blankQuiz())}
-              className="bg-[#00d4ff] hover:bg-[#33e5ff] text-[#050508] px-5 py-2 rounded font-bold text-sm
+              className="bg-[#00d4ff] hover:bg-[#33e5ff] text-[#050508] px-4 py-2 rounded font-bold text-xs
                 transition font-['Orbitron'] tracking-wider neon-border-cyan">
               + BUAT QUIZ
             </motion.button>
             <button onClick={() => { logout(); router.push("/login"); }}
-              className="text-xs text-[#546e7a] hover:text-[#ff2a6d] px-3 py-2 rounded hover:bg-[#ff2a6d]/10 transition">
+              className="text-xs text-[#546e7a] hover:text-[#ff2a6d] px-2 py-2 rounded hover:bg-[#ff2a6d]/10 transition">
               Keluar
             </button>
           </div>

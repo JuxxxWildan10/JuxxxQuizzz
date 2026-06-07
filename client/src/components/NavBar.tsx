@@ -39,9 +39,11 @@ export default function NavBar() {
     { href:"/practice",      label:"🎯 Practice"    },
     { href:"/leaderboard",   label:"🏆 Ranking"     },
     { href:"/tournaments",   label:"🏅 Turnamen"    },
+    { href:"/billing",       label:"💎 Harga"       },
     { href:"/dashboard",     label:"Dashboard", guardRole:"GURU" },
     { href:"/battle",        label:"⚔️ Play Now",  highlight:true  },
   ];
+
 
   return (
     <nav className="border-b border-[#00d4ff]/20 bg-[#050508]/80 backdrop-blur-md sticky top-0 z-50">
